@@ -112,16 +112,20 @@ char const* H264VideoRTPSink::auxSDPLine() {
   char const* fmtpFmt =
     "a=fmtp:%d packetization-mode=1"
     ";profile-level-id=%06X"
-    ";sprop-parameter-sets=%s,%s\r\n";
+    ";sprop-parameter-sets=(null)\r\na=recvonly\r\n";
+  /* changed by fanhongxuan@gmail.com*/
+  profileLevelId = 0x42C033;
+  
   unsigned fmtpFmtSize = strlen(fmtpFmt)
     + 3 /* max char len */
     + 6 /* 3 bytes in hex */
     + strlen(sps_base64) + strlen(pps_base64);
   char* fmtp = new char[fmtpFmtSize];
   sprintf(fmtp, fmtpFmt,
-          rtpPayloadType(),
-	  profileLevelId,
-          sps_base64, pps_base64);
+          /* changed by fanhongxuan@gmail.com */ 101
+          /*rtpPayloadType()*/ ,
+	  profileLevelId/*,
+          sps_base64, pps_base64*/);
 
   delete[] sps_base64;
   delete[] pps_base64;

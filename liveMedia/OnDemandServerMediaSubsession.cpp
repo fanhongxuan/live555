@@ -69,7 +69,10 @@ OnDemandServerMediaSubsession::sdpLines() {
     struct in_addr dummyAddr;
     dummyAddr.s_addr = 0;
     Groupsock* dummyGroupsock = createGroupsock(dummyAddr, 0);
-    unsigned char rtpPayloadType = 96 + trackNumber()-1; // if dynamic
+    /*note:fanhongxuan@gmail.com
+     *change the rtpPayloadType from 96 to 100
+     */
+    unsigned char rtpPayloadType = 101 + trackNumber()-1; // if dynamic
     RTPSink* dummyRTPSink = createNewRTPSink(dummyGroupsock, rtpPayloadType, inputSource);
     if (dummyRTPSink != NULL && dummyRTPSink->estimatedBitrate() > 0) estBitrate = dummyRTPSink->estimatedBitrate();
 
@@ -167,7 +170,11 @@ void OnDemandServerMediaSubsession
 	  break; // success
 	}
 
-	unsigned char rtpPayloadType = 96 + trackNumber()-1; // if dynamic
+    /**
+     * note:fanhongxuan@gmail.com
+     * change the rtpPayloadType from 96 to 100.
+     */
+	unsigned char rtpPayloadType = 101 + trackNumber()-1; // if dynamic
 	rtpSink = createNewRTPSink(rtpGroupsock, rtpPayloadType, mediaSource);
 	if (rtpSink != NULL && rtpSink->estimatedBitrate() > 0) streamBitrate = rtpSink->estimatedBitrate();
       }
@@ -426,6 +433,15 @@ void OnDemandServerMediaSubsession
 
   char const* mediaType = rtpSink->sdpMediaType();
   unsigned char rtpPayloadType = rtpSink->rtpPayloadType();
+  /* add by fanhongxuan@gmail.com*/
+  /**
+   * Note:
+   * remove the c=IN IP4 0.0.0.0 from the sdp
+   * to make sure the playback is ok.
+   */
+  // fServerAddressForSDP = 0x355A10AC; // 172.16.90.53, 0xAC105A35
+  /* add end*/
+
   AddressString ipAddressStr(fServerAddressForSDP);
   char* rtpmapLine = rtpSink->rtpmapLine();
   char const* rtcpmuxLine = fMultiplexRTCPWithRTP ? "a=rtcp-mux\r\n" : "";
@@ -435,7 +451,7 @@ void OnDemandServerMediaSubsession
 
   char const* const sdpFmt =
     "m=%s %u RTP/AVP %d\r\n"
-    "c=IN IP4 %s\r\n"
+    /*"c=IN IP4 %s\r\n"*/
     "b=AS:%u\r\n"
     "%s"
     "%s"
@@ -444,7 +460,7 @@ void OnDemandServerMediaSubsession
     "a=control:%s\r\n";
   unsigned sdpFmtSize = strlen(sdpFmt)
     + strlen(mediaType) + 5 /* max short len */ + 3 /* max char len */
-    + strlen(ipAddressStr.val())
+    /*+ strlen(ipAddressStr.val())*/
     + 20 /* max int len */
     + strlen(rtpmapLine)
     + strlen(rtcpmuxLine)
@@ -456,7 +472,7 @@ void OnDemandServerMediaSubsession
 	  mediaType, // m= <media>
 	  fPortNumForSDP, // m= <port>
 	  rtpPayloadType, // m= <fmt list>
-	  ipAddressStr.val(), // c= address
+	  /*ipAddressStr.val(), // c= address*/
 	  estBitrate, // b=AS:<bandwidth>
 	  rtpmapLine, // a=rtpmap:... (if present)
 	  rtcpmuxLine, // a=rtcp-mux:... (if present)

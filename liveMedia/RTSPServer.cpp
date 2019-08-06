@@ -1617,16 +1617,18 @@ void RTSPServer::RTSPClientSession
   unsigned rtspURLSize = strlen(rtspURL);
   
   // Parse the client's "Scale:" header, if any:
-  float scale;
+  float scale = .0;
   Boolean sawScaleHeader = parseScaleHeader(fullRequestStr, scale);
-  
+  printf("fanhongxuan:request scale:%f\n", scale);
   // Try to set the stream's scale factor to this value:
   if (subsession == NULL /*aggregate op*/) {
+    printf("call fOurServerMediaSession->testScaleFactor\n");
     fOurServerMediaSession->testScaleFactor(scale);
   } else {
+    printf("call subsession->testScaleFactor\n");
     subsession->testScaleFactor(scale);
   }
-  
+  printf("reply scale:%f\n", scale);
   char buf[100];
   char* scaleHeader;
   if (!sawScaleHeader) {
@@ -1752,6 +1754,9 @@ void RTSPServer::RTSPClientSession
       rangeStart = curNPT;
     }
 
+    // add by fanhongxuan@gmail.com
+    rangeStart = 0.0;
+    rangeEnd = 600.0;
     if (rangeEnd == 0.0 && scale >= 0.0) {
       sprintf(buf, "Range: npt=%.3f-\r\n", rangeStart);
     } else {
@@ -1816,6 +1821,7 @@ void RTSPServer::RTSPClientSession
 	   rangeHeader,
 	   fOurSessionId,
 	   rtpInfo);
+  printf("scaleHeader:%s\n", scaleHeader);
   delete[] rtpInfo; delete[] rangeHeader;
   delete[] scaleHeader; delete[] rtspURL;
 }

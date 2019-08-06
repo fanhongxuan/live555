@@ -119,7 +119,9 @@ void ServerMediaSession::testScaleFactor(float& scale) {
   for (subsession = fSubsessionsHead; subsession != NULL;
        subsession = subsession->fNext) {
     float ssscale = scale;
+    printf("before call subsession->testScaleFactor:%f\n", ssscale);
     subsession->testScaleFactor(ssscale);
+    printf("after call subsession->testScaleFactor:%f\n", ssscale);
     if (subsession == fSubsessionsHead) { // this is the first subsession
       minSSScale = maxSSScale = bestSSScale = ssscale;
       bestDistanceTo1 = (float)fabs(ssscale - 1.0f);
@@ -245,6 +247,9 @@ char* ServerMediaSession::generateSDPDescription() {
 
     // Unless subsessions have differing durations, we also have a "a=range:" line:
     float dur = duration();
+    // add by fanhongxuan@gmail.com
+    dur = 600.0;
+    // add by fanhongxuan@gmail.com end
     if (dur == 0.0) {
       rangeLine = strDup("a=range:npt=0-\r\n");
     } else if (dur > 0.0) {
@@ -260,7 +265,8 @@ char* ServerMediaSession::generateSDPDescription() {
       "o=- %ld%06ld %d IN IP4 %s\r\n"
       "s=%s\r\n"
       "i=%s\r\n"
-      "t=0 0\r\n"
+      /*modified by fanhongxuan@gmail.com*/
+      "t=0 600\r\n"
       "a=tool:%s%s\r\n"
       "a=type:broadcast\r\n"
       "a=control:*\r\n"
@@ -446,6 +452,8 @@ ServerMediaSubsession::rangeSDPLine() const {
 
   // Use our own duration for a "a=range:" line:
   float ourDuration = duration();
+  // add by fanhongxuan@gmail.com
+  ourDuration = 600.0;
   if (ourDuration == 0.0) {
     return strDup("a=range:npt=0-\r\n");
   } else {

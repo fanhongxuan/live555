@@ -43,6 +43,8 @@ Boolean RTPSink::isRTPSink() const {
   return True;
 }
 
+extern Boolean g_support_vlc;
+
 RTPSink::RTPSink(UsageEnvironment& env,
 		 Groupsock* rtpGS, unsigned char rtpPayloadType,
 		 unsigned rtpTimestampFrequency,
@@ -55,6 +57,12 @@ RTPSink::RTPSink(UsageEnvironment& env,
     fNumChannels(numChannels), fEstimatedBitrate(0) {
   fRTPPayloadFormatName
     = strDup(rtpPayloadFormatName == NULL ? "???" : rtpPayloadFormatName);
+  // add by fanhongxuan@gmail.com
+  if (g_support_vlc == True){
+    // If need support VLC, change the payloadFormatName to MP2P.
+    printf("fRTPPayloadFormatName:%s, rtpTimestampFrequency:%d\n", fRTPPayloadFormatName, rtpTimestampFrequency);
+    fRTPPayloadFormatName = strDup("MP2P");
+  }
   gettimeofday(&fCreationTime, NULL);
   fTotalOctetCountStartTime = fCreationTime;
   resetPresentationTimes();

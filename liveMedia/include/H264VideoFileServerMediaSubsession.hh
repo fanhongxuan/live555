@@ -34,7 +34,7 @@ public:
   // Used to implement "getAuxSDPLine()":
   void checkForAuxSDPLine1();
   void afterPlayingDummy1();
-
+  virtual void testScaleFactor(float& scale);
 protected:
   H264VideoFileServerMediaSubsession(UsageEnvironment& env,
 				      char const* fileName, Boolean reuseFirstSource);

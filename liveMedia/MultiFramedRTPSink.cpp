@@ -169,11 +169,19 @@ void MultiFramedRTPSink::stopPlaying() {
   MediaSink::stopPlaying();
 }
 
+Boolean g_support_vlc = False;
+
 void MultiFramedRTPSink::buildAndSendPacket(Boolean isFirstPacket) {
   nextTask() = NULL;
   fIsFirstPacket = isFirstPacket;
 
   // Set up the RTP header:
+  /**
+   * modified by fanhongxuan@gmail.com
+   */
+  if (g_support_vlc != True){
+    fRTPPayloadType = 96;
+  }
   unsigned rtpHdr = 0x80000000; // RTP version 2; marker ('M') bit not set (by default; it can be set later)
   rtpHdr |= (fRTPPayloadType<<16);
   rtpHdr |= fSeqNo; // sequence number

@@ -41,6 +41,15 @@ H264VideoFileServerMediaSubsession::~H264VideoFileServerMediaSubsession() {
   delete[] fAuxSDPLine;
 }
 
+float gRTSPScale = 1.0;
+void H264VideoFileServerMediaSubsession::testScaleFactor(float& scale)
+{
+   if (scale >= 0.01){
+     gRTSPScale = scale;
+     printf("Set H264 scale to %f\n", gRTSPScale);
+   }
+}
+
 static void afterPlayingDummy(void* clientData) {
   H264VideoFileServerMediaSubsession* subsess = (H264VideoFileServerMediaSubsession*)clientData;
   subsess->afterPlayingDummy1();

@@ -20,8 +20,61 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include <BasicUsageEnvironment.hh>
 #include "DynamicRTSPServer.hh"
 #include "version.hh"
+// #define DUMP_STACK
+#ifdef DUMP_STACK
+// add by fanhongxuan@gmail.com for debug the segment fault:
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <execinfo.h>
+#include <signal.h>
 
+/* Obtain a backtrace and print it to stdout. */
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+void dump_stack(void)
+{
+	void *array[30] = { 0 };
+	size_t size = backtrace(array, ARRAY_SIZE(array));
+	char **strings = backtrace_symbols(array, size);
+	size_t i;
+
+	if (strings == NULL)
+	{
+		perror("backtrace_symbols.");
+		exit(EXIT_FAILURE);
+	}
+
+	printf("Obtained %zd stack frames.\n", size);
+
+	for (i = 0; i < size; i++)
+		printf("%s\n", strings[i]);
+
+	free(strings);
+	strings = NULL;
+
+	exit(EXIT_SUCCESS);
+}
+
+void sighandler_dump_stack(int sig)
+{
+	psignal(sig, "handler");
+	dump_stack();
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+#endif 
+//
+
+extern Boolean g_support_vlc;
 int main(int argc, char** argv) {
+#ifdef DUMP_STACK    
+    if (signal(SIGSEGV, sighandler_dump_stack) == SIG_ERR)
+		perror("can't catch SIGSEGV");
+#endif    
+  if (argc == 2 && strcmp(argv[1], "vlc") == 0){
+    g_support_vlc = True;
+  }
+  
   // Begin by setting up our usage environment:
   TaskScheduler* scheduler = BasicTaskScheduler::createNew();
   UsageEnvironment* env = BasicUsageEnvironment::createNew(*scheduler);

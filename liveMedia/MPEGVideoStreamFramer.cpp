@@ -170,6 +170,9 @@ void MPEGVideoStreamFramer::continueReadProcessing() {
       = (fFrameRate == 0.0 || ((int)fPictureCount) < 0) ? 0
       : (unsigned)((fPictureCount*1000000)/fFrameRate);
 #ifdef DEBUG
+    // note:fanhongxuan@gmail.com
+    // memset(fTo, 0xff, fFrameSize);
+    //fprintf(stderr, "0x%02x,0x%02x,0x%02x\n", fTo[0], fTo[1], fTo[2]);
     fprintf(stderr, "%d bytes @%u.%06d, fDurationInMicroseconds: %d ((%d*1000000)/%f)\n", acquiredFrameSize, fPresentationTime.tv_sec, fPresentationTime.tv_usec, fDurationInMicroseconds, fPictureCount, fFrameRate);
 #endif
     fPictureCount = 0;

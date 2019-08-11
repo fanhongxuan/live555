@@ -49,7 +49,10 @@ ServerMediaSession* DynamicRTSPServer
   // First, check whether the specified "streamName" exists as a local file:
   FILE* fid = fopen(streamName, "rb");
   Boolean fileExists = fid != NULL;
-
+  printf("streamName:%s\n", streamName);
+  if ((!fileExists) && strstr(streamName, "localsdk") != NULL){
+      fileExists = true;
+  }
   // Next, check whether we already have a "ServerMediaSession" for this file:
   ServerMediaSession* sms = RTSPServer::lookupServerMediaSession(streamName);
   Boolean smsExists = sms != NULL;
@@ -73,10 +76,12 @@ ServerMediaSession* DynamicRTSPServer
 
     if (sms == NULL) {
       sms = createNewSMS(envir(), streamName, fid); 
+      printf("before call addServerMediaSession\n");
       addServerMediaSession(sms);
     }
-
-    fclose(fid);
+    if (NULL != fid){
+        fclose(fid);
+    }
     return sms;
   }
 }

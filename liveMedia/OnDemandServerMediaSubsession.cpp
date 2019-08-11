@@ -22,6 +22,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "OnDemandServerMediaSubsession.hh"
 #include <GroupsockHelper.hh>
 
+#include "ByteStreamFileSource.hh"
 OnDemandServerMediaSubsession
 ::OnDemandServerMediaSubsession(UsageEnvironment& env,
 				Boolean reuseFirstSource,
@@ -81,7 +82,7 @@ OnDemandServerMediaSubsession::sdpLines() {
     delete dummyGroupsock;
     closeStreamSource(inputSource);
   }
-
+  Logi("After sdpLines");
   return fSDPLines;
 }
 
@@ -115,7 +116,7 @@ void OnDemandServerMediaSubsession
     unsigned streamBitrate;
     FramedSource* mediaSource
       = createNewStreamSource(clientSessionId, streamBitrate);
-
+    Logi("In GetStreamParamters");
     // Create 'groupsock' and 'sink' objects for the destination,
     // using previously unused server port numbers:
     RTPSink* rtpSink = NULL;
@@ -192,12 +193,13 @@ void OnDemandServerMediaSubsession
 	increaseSendBufferTo(envir(), rtpGroupsock->socketNum(), rtpBufSize);
       }
     }
-
+    
     // Set up the state of the stream.  The stream will get started later:
     streamToken = fLastStreamToken
       = new StreamState(*this, serverRTPPort, serverRTCPPort, rtpSink, udpSink,
 			streamBitrate, mediaSource,
 			rtpGroupsock, rtcpGroupsock);
+    Logi("rtpSink:%p, streamToken:%p", rtpSink, streamToken);
   }
 
   // Record these destinations as being for this client session id:
@@ -226,9 +228,12 @@ void OnDemandServerMediaSubsession::startStream(unsigned clientSessionId,
 			      rtcpRRHandler, rtcpRRHandlerClientData,
 			      serverRequestAlternativeByteHandler, serverRequestAlternativeByteHandlerClientData);
     RTPSink* rtpSink = streamState->rtpSink(); // alias
+    Logi("rtpSink:%p,streamState:%p", rtpSink, streamState);
     if (rtpSink != NULL) {
       rtpSeqNum = rtpSink->currentSeqNo();
       rtpTimestamp = rtpSink->presetNextTimestamp();
+      Logi("rtpSeqNum:%d", rtpSeqNum);
+      Logi("rtpTimestamp:%d", rtpTimestamp);
     }
   }
 }
@@ -491,12 +496,16 @@ void OnDemandServerMediaSubsession
 static void afterPlayingStreamState(void* clientData) {
   StreamState* streamState = (StreamState*)clientData;
   if (streamState->streamDuration() == 0.0) {
+    Logi("streamDuration is 0.0");
     // When the input stream ends, tear it down.  This will cause a RTCP "BYE"
     // to be sent to each client, teling it that the stream has ended.
     // (Because the stream didn't have a known duration, there was no other
     //  way for clients to know when the stream ended.)
     streamState->reclaim();
   }
+  else{
+    Logi("streamDuration:%f", streamState->streamDuration());
+    }
   // Otherwise, keep the stream alive, in case a client wants to
   // subsequently re-play the stream starting from somewhere other than the end.
   // (This can be done only on streams that have a known duration.)
@@ -623,6 +632,7 @@ void StreamState::sendRTCPAppPacket(u_int8_t subtype, char const* name,
 }
 
 void StreamState::reclaim() {
+    Logi("change RTPSink from(%p) to null", fRTPSink);
   // Delete allocated media objects
   Medium::close(fRTCPInstance) /* will send a RTCP BYE */; fRTCPInstance = NULL;
   Medium::close(fRTPSink); fRTPSink = NULL;

@@ -136,6 +136,7 @@ void FileSink::afterGettingFrame(unsigned frameSize,
   addData(fBuffer, frameSize, presentationTime);
 
   if (fOutFid == NULL || fflush(fOutFid) == EOF) {
+    printf("******** onSourceClosure\n");
     // The output file has closed.  Handle this the same way as if the input source had closed:
     if (fSource != NULL) fSource->stopGettingFrames();
     onSourceClosure();

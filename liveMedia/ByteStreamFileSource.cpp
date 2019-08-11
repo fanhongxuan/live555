@@ -23,19 +23,157 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "GroupsockHelper.hh"
 
 ////////// ByteStreamFileSource //////////
+#include "LocalSdk.h"
+#define READ_FROM_FILES_SYNCHRONOUSLY
+void logBegin(const char *type, const char *file, const char *function, int line);
+void logEnd();
+#define Logi(...) do{logBegin("info" , __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
+#define Loge(...) do{logBegin("error", __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
+
+class H264FrameBuffer{
+public:
+    unsigned char *pHeader;
+    unsigned char *pContent;
+    unsigned long nLength;
+    unsigned long nFrameLength;
+    unsigned int FrameType;
+    unsigned int nSubType;
+    unsigned int nEncodeType;
+    unsigned int nFrameRate;
+    unsigned int nWidth;
+    unsigned int nHeight;
+};
+
+static pthread_mutex_t gLogMutex = PTHREAD_MUTEX_INITIALIZER;
+
+void logBegin(const char *type, const char *file, const char *function, int line)
+{
+    time_t timevalue=time(NULL);
+    struct tm t;
+    memset(&t, 0, sizeof(t));
+	localtime_r(&timevalue,&t);
+    struct timeval now;
+    gettimeofday(&now, NULL);
+	printf("[%04d-%02d-%02d %02d:%02d:%02d-%03d][%s][%s:%s:%d]",
+        t.tm_year + 1900, 
+        t.tm_mon + 1, 
+        t.tm_mday,
+        t.tm_hour, 
+        t.tm_min, 
+        t.tm_sec, 
+        (int)now.tv_usec/1000,
+        type,
+        file,
+        function, 
+        line);
+    pthread_mutex_lock(&gLogMutex);
+}
+
+void logEnd()
+{
+    printf("\n");
+    pthread_mutex_unlock(&gLogMutex);
+}
+
+static int buildFileInfoByName(LOCALSDK_FILE_DATA *pFileInfo, const char *pFileName){
+    // todo:fanhongxan@gmail.com
+    // parse the filename, channel, startTime/stopTime, size info from the pFileName
+    // format is channel/size/starttime/stoptime/name.264
+    int i = 0;
+    int channel = 0, size = 0,starttime = 0, stoptime = 0;
+    int ret = sscanf(pFileName, "%d/%d/%d/%d-%s", &channel, &size, &starttime, &stoptime, pFileInfo->sFileName);
+    Logi("pFileName:%s(%s)", pFileName, pFileInfo->sFileName);
+    if (strlen(pFileInfo->sFileName) > 4){
+        pFileInfo->sFileName[strlen(pFileInfo->sFileName)- strlen(".264")] = 0;
+    }
+    Logi("filename:%s", pFileInfo->sFileName);
+    Logi("channel:%d, size:%d kb, starttime:%d, stoptime:%d", channel, size, starttime, stoptime);
+    pFileInfo->nChannel = channel;
+    pFileInfo->nSize = size;
+    // pFileInfo->nBeginTime;
+    //pFileInfo->nEndTime;
+    return 0;
+}
+
+
+static  int PlayBackCallBackV2(long lRealHandle, 
+                               SDK_H264_FRAME_INFO *pFrameInfo,
+                               unsigned long dwUser)
+{
+    ByteStreamFileSource *pSource = (ByteStreamFileSource *)(dwUser);
+    H264FrameBuffer *pBuffer = new H264FrameBuffer();
+    pBuffer->pHeader = pFrameInfo->pHeader;
+    pBuffer->pContent = pFrameInfo->pContent;
+    pBuffer->nLength = pFrameInfo->nLength;
+    pBuffer->nFrameLength = pFrameInfo->nFrameLength;
+    pBuffer->FrameType = pFrameInfo->FrameType;
+    pBuffer->nSubType = pFrameInfo->nSubType;
+    pBuffer->nFrameRate = pFrameInfo->nFrameRate;
+    pBuffer->nWidth = pFrameInfo->nWidth;
+    pBuffer->nHeight = pFrameInfo->nHeight;
+    pSource->addFrameBuffer(pBuffer);
+    return 0;
+}
+
+static int EndCallBack(long lRealHandle, unsigned long dwUser)
+{
+    ByteStreamFileSource *pSource = (ByteStreamFileSource*)(dwUser);
+#ifdef USE_LOCALSDK    
+    LOCALSDK_StopGetFile(lRealHandle);
+#endif    
+    pSource->setFileHandle(0);
+    return 0;
+}
 
 ByteStreamFileSource*
 ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
 				unsigned preferredFrameSize,
-				unsigned playTimePerFrame) {
-  FILE* fid = OpenInputFile(env, fileName);
-  if (fid == NULL) return NULL;
+				unsigned playTimePerFrame) 
+{
+    // open the localinput file
+    Logi("CreateNew fileName:%s", fileName);
+    if (strstr(fileName, "localsdk") == fileName){
+        // call localsdk api to get the filehandle
+        LOCALSDK_FILE_DATA fileInfo;
+        memset(&fileInfo, 0, sizeof(fileInfo));
+        buildFileInfoByName(&fileInfo, fileName);
+        ByteStreamFileSource* newSource
+        = new ByteStreamFileSource(env, NULL, preferredFrameSize, playTimePerFrame);
+        
+        long handle = 0;
+        int streamtype = 0;
+        unsigned long dwUser = (unsigned long)newSource;
+        int ret = 0;
+#ifdef USE_LOCALSDK        
+        LOCALSDK_GetFileByNameV2(&fileInfo, 
+                                 PlayBackCallBackV2, 
+                                 dwUser, 	
+                                 EndCallBack, 
+                                 dwUser, 
+                                 &handle,
+                                 streamtype); 
+#else
+        handle = 2;
+#endif        
+        if (ret != 0){
+            Loge("LOCALSDK_GetFileByNameV2 failed(%d):(%s)", ret, fileName);
+            return NULL;
+        }
+        // todo:fanhongxan@gmail.com
+        // how to get the file info?
+        // newSource->fFileSize = GetFileSize(fileName, fid);
+        newSource->setFileHandle(handle);
+        newSource->fFileSize = 102400;
+        return newSource;
+    }
+    FILE* fid = OpenInputFile(env, fileName);
+    if (fid == NULL) return NULL;
 
-  ByteStreamFileSource* newSource
+    ByteStreamFileSource* newSource
     = new ByteStreamFileSource(env, fid, preferredFrameSize, playTimePerFrame);
-  newSource->fFileSize = GetFileSize(fileName, fid);
-
-  return newSource;
+    newSource->fFileSize = GetFileSize(fileName, fid);
+    
+    return newSource;
 }
 
 ByteStreamFileSource*
@@ -72,7 +210,7 @@ ByteStreamFileSource::ByteStreamFileSource(UsageEnvironment& env, FILE* fid,
 					   unsigned preferredFrameSize,
 					   unsigned playTimePerFrame)
   : FramedFileSource(env, fid), fFileSize(0), fPreferredFrameSize(preferredFrameSize),
-    fPlayTimePerFrame(playTimePerFrame), fLastPlayTime(0),
+    fPlayTimePerFrame(playTimePerFrame), fLastPlayTime(0), mlFileHandle(0),
     fHaveStartedReading(False), fLimitNumBytesToStream(False), fNumBytesToStream(0) {
 #ifndef READ_FROM_FILES_SYNCHRONOUSLY
   makeSocketNonBlocking(fileno(fFid));
@@ -88,16 +226,22 @@ ByteStreamFileSource::~ByteStreamFileSource() {
 #ifndef READ_FROM_FILES_SYNCHRONOUSLY
   envir().taskScheduler().turnOffBackgroundReadHandling(fileno(fFid));
 #endif
-
+    if (0 != mlFileHandle){
+#ifdef USE_LOCALSDK        
+        LOCALSDK_StopGetFile(mlFileHandle);
+#endif        
+    }
   CloseInputFile(fFid);
 }
 
 void ByteStreamFileSource::doGetNextFrame() {
-  if (feof(fFid) || ferror(fFid) || (fLimitNumBytesToStream && fNumBytesToStream == 0)) {
-    handleClosure();
-    return;
-  }
-
+    if (0 == mlFileHandle){
+        if (feof(fFid) || ferror(fFid) || (fLimitNumBytesToStream && fNumBytesToStream == 0)) {
+            handleClosure();
+            return;
+        }
+    }
+    
 #ifdef READ_FROM_FILES_SYNCHRONOUSLY
   doReadFromFile();
 #else
@@ -126,6 +270,25 @@ void ByteStreamFileSource::fileReadableHandler(ByteStreamFileSource* source, int
   source->doReadFromFile();
 }
 
+void ByteStreamFileSource::setFileHandle(long fileHandle)
+{
+    mlFileHandle = fileHandle;
+    pthread_cond_init(&mFrameBufferCond, NULL);
+    pthread_mutex_init(&mFrameBufferMutex, NULL);
+}
+
+void ByteStreamFileSource::addFrameBuffer(H264FrameBuffer *pBuffer)
+{
+    pthread_mutex_lock(&mFrameBufferMutex);
+    mFrameBufferList.push_back(pBuffer);
+    pthread_mutex_unlock(&mFrameBufferMutex);
+    if (mFrameBufferList.size() > 2){
+        // wait on the event
+        Logi("localsdk wait for the next peek event");
+        pthread_cond_wait(&mFrameBufferCond, &mFrameBufferMutex);
+    }
+}
+
 void ByteStreamFileSource::doReadFromFile() {
   // Try to read as many bytes as will fit in the buffer provided (or "fPreferredFrameSize" if less)
   if (fLimitNumBytesToStream && fNumBytesToStream < (u_int64_t)fMaxSize) {
@@ -135,7 +298,33 @@ void ByteStreamFileSource::doReadFromFile() {
     fMaxSize = fPreferredFrameSize;
   }
 #ifdef READ_FROM_FILES_SYNCHRONOUSLY
-  fFrameSize = fread(fTo, 1, fMaxSize, fFid);
+#ifdef USE_LOCALSDK
+    // todo:fanhongxan@gmail.com
+    // popup one frame from the framebuffer
+    if (mFrameBufferList.size() != 0){
+        H264FrameBuffer *pBuffer = NULL;
+        pthread_mutex_lock(&mFrameBufferMutex);
+        pBuffer = mFrameBufferList.front();
+        mFrameBufferList.pop_front();
+        pthread_mutex_unlock(&mFrameBufferMutex);
+        pthread_cond_signal(&mFrameBufferCond);
+        Logi("localsdk send the peek signal");
+        fFrameSize = pBuffer->nLength;
+        memcpy(fTo, pBuffer->pContent, fFrameSize);
+        delete(pBuffer);
+    }
+    else{
+        fFrameSize = 0;
+    }
+#else
+    if (NULL != fFid){
+        fFrameSize = fread(fTo, 1, fMaxSize, fFid);
+    }
+    else{
+        Logi("fill a temp frame");
+        fFrameSize = 10240;
+    }
+#endif    
 #else
   if (fFidIsSeekable) {
     fFrameSize = fread(fTo, 1, fMaxSize, fFid);

@@ -27,8 +27,12 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 H264VideoFileServerMediaSubsession*
 H264VideoFileServerMediaSubsession::createNew(UsageEnvironment& env,
 					      char const* fileName,
-					      Boolean reuseFirstSource) {
-  return new H264VideoFileServerMediaSubsession(env, fileName, reuseFirstSource);
+					      Boolean reuseFirstSource) 
+{
+    Logi("H264VideoFileServerMediaSubsession:createNew:%s", fileName);
+    H264VideoFileServerMediaSubsession *pRet = new H264VideoFileServerMediaSubsession(env, fileName, reuseFirstSource);
+    Logi("After createNew");
+    return pRet;
 }
 
 H264VideoFileServerMediaSubsession::H264VideoFileServerMediaSubsession(UsageEnvironment& env,

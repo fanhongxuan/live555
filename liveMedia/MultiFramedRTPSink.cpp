@@ -405,6 +405,7 @@ void MultiFramedRTPSink::sendPacketIfNecessary() {
   fNumFramesUsedSoFar = 0;
 
   if (fNoFramesLeft) {
+    printf("****************Call onSourceClosure\n");
     // We're done:
     onSourceClosure();
   } else {

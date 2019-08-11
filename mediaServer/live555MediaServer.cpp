@@ -20,7 +20,6 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include <BasicUsageEnvironment.hh>
 #include "DynamicRTSPServer.hh"
 #include "version.hh"
-// #define DUMP_STACK
 #ifdef DUMP_STACK
 // add by fanhongxuan@gmail.com for debug the segment fault:
 #include <stdio.h>

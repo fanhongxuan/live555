@@ -25,6 +25,17 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "FramedFileSource.hh"
 #endif
 
+// add by fanhongxuan@gmail.com
+#include <pthread.h>
+#include <list>
+
+void logBegin(const char *type, const char *file, const char *function, int line);
+void logEnd();
+#define Logi(...) do{logBegin("info" , __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
+#define Loge(...) do{logBegin("error", __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
+
+class H264FrameBuffer;
+
 class ByteStreamFileSource: public FramedFileSource {
 public:
   static ByteStreamFileSource* createNew(UsageEnvironment& env,
@@ -49,6 +60,9 @@ public:
   void seekToByteRelative(int64_t offset, u_int64_t numBytesToStream = 0);
   void seekToEnd(); // to force EOF handling on the next read
 
+  // add by fanhongxuan@gmail.com
+  void setFileHandle(long fileHandle);
+  void addFrameBuffer(H264FrameBuffer *pBuffer);
 protected:
   ByteStreamFileSource(UsageEnvironment& env,
 		       FILE* fid,
@@ -70,6 +84,11 @@ protected:
   u_int64_t fFileSize;
 
 private:
+  // add by fanhongxuan@gmail.com
+  long mlFileHandle;
+  std::list<H264FrameBuffer *> mFrameBufferList;
+  pthread_mutex_t mFrameBufferMutex;
+  pthread_cond_t  mFrameBufferCond;
   unsigned fPreferredFrameSize;
   unsigned fPlayTimePerFrame;
   Boolean fFidIsSeekable;

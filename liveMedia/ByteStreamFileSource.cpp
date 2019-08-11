@@ -81,10 +81,12 @@ static int buildFileInfoByName(LOCALSDK_FILE_DATA *pFileInfo, const char *pFileN
     // format is channel/size/starttime/stoptime/name.264
     int i = 0;
     int channel = 0, size = 0,starttime = 0, stoptime = 0;
-    int ret = sscanf(pFileName, "%d/%d/%d/%d-%s", &channel, &size, &starttime, &stoptime, pFileInfo->sFileName);
+    int ret = sscanf(pFileName, "localsdk/%d/%d/%d/%d-%s", &channel, &size, &starttime, &stoptime, pFileInfo->sFileName);
     Logi("pFileName:%s(%s)", pFileName, pFileInfo->sFileName);
-    if (strlen(pFileInfo->sFileName) > 4){
-        pFileInfo->sFileName[strlen(pFileInfo->sFileName)- strlen(".264")] = 0;
+    char *ext = strstr(pFileInfo->sFileName, ".h264.264");
+    if (NULL != ext){
+        //pFileInfo->sFileName[strlen(pFileInfo->sFileName)- strlen(".264")] = 0;
+        pFileInfo->sFileName[ext - pFileInfo->sFileName] = 0;
     }
     Logi("filename:%s", pFileInfo->sFileName);
     Logi("channel:%d, size:%d kb, starttime:%d, stoptime:%d", channel, size, starttime, stoptime);
@@ -125,6 +127,8 @@ static int EndCallBack(long lRealHandle, unsigned long dwUser)
     return 0;
 }
 
+static LOCALSDK_DEVICE_INFO_V2 theDeviceInfo;
+
 ByteStreamFileSource*
 ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
 				unsigned preferredFrameSize,
@@ -133,6 +137,13 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
     // open the localinput file
     Logi("CreateNew fileName:%s", fileName);
     if (strstr(fileName, "localsdk") == fileName){
+#ifdef USE_LOCAL_SDK
+        Logi("Call LOCALSDK_StartUp to bringup the device");
+        LOCALSDK_StartUp();
+        Logi("Call LOCALSDK_GetDevInfo");
+        LOCALSDK_GetDevInfo(&theDeviceInfo);
+#endif
+        
         // call localsdk api to get the filehandle
         LOCALSDK_FILE_DATA fileInfo;
         memset(&fileInfo, 0, sizeof(fileInfo));

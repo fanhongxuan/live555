@@ -36,7 +36,7 @@ PacketSizeTable::~PacketSizeTable() {
 OggFileParser::OggFileParser(OggFile& ourFile, FramedSource* inputSource,
 			     FramedSource::onCloseFunc* onEndFunc, void* onEndClientData,
 			     OggDemux* ourDemux)
-  : StreamParser(inputSource, onEndFunc, onEndClientData, continueParsing, this),
+  : LStreamParser(inputSource, onEndFunc, onEndClientData, continueParsing, this),
     fOurFile(ourFile), fInputSource(inputSource),
     fOnEndFunc(onEndFunc), fOnEndClientData(onEndClientData),
     fOurDemux(ourDemux), fNumUnfulfilledTracks(0),

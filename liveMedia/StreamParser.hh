@@ -25,7 +25,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "FramedSource.hh"
 #endif
 
-class StreamParser {
+class LStreamParser {
 public:
   virtual void flushInput();
 
@@ -33,12 +33,12 @@ protected: // we're a virtual base class
   typedef void (clientContinueFunc)(void* clientData,
 				    unsigned char* ptr, unsigned size,
 				    struct timeval presentationTime);
-  StreamParser(FramedSource* inputSource,
+  LStreamParser(FramedSource* inputSource,
 	       FramedSource::onCloseFunc* onInputCloseFunc,
 	       void* onInputCloseClientData,
 	       clientContinueFunc* clientContinueFunc,
 	       void* clientContinueClientData);
-  virtual ~StreamParser();
+  virtual ~LStreamParser();
 
   void saveParserState();
   virtual void restoreSavedParserState();

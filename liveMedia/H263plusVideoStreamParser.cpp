@@ -28,7 +28,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 H263plusVideoStreamParser::H263plusVideoStreamParser(
                               H263plusVideoStreamFramer* usingSource,
                               FramedSource* inputSource)
-                              : StreamParser(inputSource,
+                              : LStreamParser(inputSource,
                                    FramedSource::handleClosure,
                                    usingSource,
                                    &H263plusVideoStreamFramer::continueReadProcessing,
@@ -52,7 +52,7 @@ H263plusVideoStreamParser::~H263plusVideoStreamParser()
 ///////////////////////////////////////////////////////////////////////////////
 void H263plusVideoStreamParser::restoreSavedParserState()
 {
-   StreamParser::restoreSavedParserState();
+   LStreamParser::restoreSavedParserState();
    fTo = fSavedTo;
    fNumTruncatedBytes = fSavedNumTruncatedBytes;
 }
@@ -62,7 +62,7 @@ void H263plusVideoStreamParser::setParseState()
 {
    fSavedTo = fTo;
    fSavedNumTruncatedBytes = fNumTruncatedBytes;
-   saveParserState();  // Needed for the parsing process in StreamParser
+   saveParserState();  // Needed for the parsing process in LStreamParser
 }
 
 
@@ -130,7 +130,7 @@ unsigned H263plusVideoStreamParser::parse(u_int64_t & currentDuration)
          //GetMaxBitrate(&fMaxBitrateCtx, frameSize, prevTrDifference);
          //prevTrDifference = trDifference;
 
-	 setParseState(); // Needed for the parsing process in StreamParser
+	 setParseState(); // Needed for the parsing process in LStreamParser
       }
    } catch (int /*e*/) {
 #ifdef DEBUG

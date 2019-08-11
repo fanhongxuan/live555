@@ -25,7 +25,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 
 ////////// MPEG1or2AudioStreamParser definition //////////
 
-class MPEG1or2AudioStreamParser: public StreamParser {
+class MPEG1or2AudioStreamParser: public LStreamParser {
 public:
   MPEG1or2AudioStreamParser(MPEG1or2AudioStreamFramer* usingSource,
 			FramedSource* inputSource);
@@ -163,7 +163,7 @@ void MPEG1or2AudioStreamFramer::continueReadProcessing() {
 MPEG1or2AudioStreamParser
 ::MPEG1or2AudioStreamParser(MPEG1or2AudioStreamFramer* usingSource,
 			FramedSource* inputSource)
-  : StreamParser(inputSource, FramedSource::handleClosure, usingSource,
+  : LStreamParser(inputSource, FramedSource::handleClosure, usingSource,
 		 &MPEG1or2AudioStreamFramer::continueReadProcessing, usingSource) {
 }
 

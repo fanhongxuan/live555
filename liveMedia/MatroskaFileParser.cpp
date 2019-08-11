@@ -26,7 +26,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 MatroskaFileParser::MatroskaFileParser(MatroskaFile& ourFile, FramedSource* inputSource,
 				       FramedSource::onCloseFunc* onEndFunc, void* onEndClientData,
 				       MatroskaDemux* ourDemux)
-  : StreamParser(inputSource, onEndFunc, onEndClientData, continueParsing, this),
+  : LStreamParser(inputSource, onEndFunc, onEndClientData, continueParsing, this),
     fOurFile(ourFile), fInputSource(inputSource),
     fOnEndFunc(onEndFunc), fOnEndClientData(onEndClientData),
     fOurDemux(ourDemux),
@@ -1479,7 +1479,7 @@ void MatroskaFileParser::setParseState() {
 }
 
 void MatroskaFileParser::restoreSavedParserState() {
-  StreamParser::restoreSavedParserState();
+  LStreamParser::restoreSavedParserState();
   fCurOffsetInFile = fSavedCurOffsetInFile;
   fCurOffsetWithinFrame = fSavedCurOffsetWithinFrame;
 }

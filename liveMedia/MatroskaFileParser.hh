@@ -43,7 +43,7 @@ enum MatroskaParseState {
   DELIVERING_FRAME_BYTES
 };
 
-class MatroskaFileParser: public StreamParser {
+class MatroskaFileParser: public LStreamParser {
 public:
   MatroskaFileParser(MatroskaFile& ourFile, FramedSource* inputSource,
 		     FramedSource::onCloseFunc* onEndFunc, void* onEndClientData,
@@ -52,7 +52,7 @@ public:
 
   void seekToTime(double& seekNPT);
 
-  // StreamParser 'client continue' function:
+  // LStreamParser 'client continue' function:
   static void continueParsing(void* clientData, unsigned char* ptr, unsigned size, struct timeval presentationTime);
   void continueParsing();
 

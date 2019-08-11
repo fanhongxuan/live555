@@ -68,7 +68,7 @@ typedef struct _MaxBitrate_CTX {
 } MaxBitrate_CTX;
 
 
-class H263plusVideoStreamParser : public StreamParser {
+class H263plusVideoStreamParser : public LStreamParser {
 
 public:
    H263plusVideoStreamParser( class H263plusVideoStreamFramer* usingSource,

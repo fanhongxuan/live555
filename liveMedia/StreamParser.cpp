@@ -25,13 +25,13 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 
 #define BANK_SIZE 150000
 
-void StreamParser::flushInput() {
+void LStreamParser::flushInput() {
   fCurParserIndex = fSavedParserIndex = 0;
   fSavedRemainingUnparsedBits = fRemainingUnparsedBits = 0;
   fTotNumValidBytes = 0;
 }
 
-StreamParser::StreamParser(FramedSource* inputSource,
+LStreamParser::LStreamParser(FramedSource* inputSource,
 			   FramedSource::onCloseFunc* onInputCloseFunc,
 			   void* onInputCloseClientData,
 			   clientContinueFunc* clientContinueFunc,
@@ -51,21 +51,21 @@ StreamParser::StreamParser(FramedSource* inputSource,
   fLastSeenPresentationTime.tv_sec = 0; fLastSeenPresentationTime.tv_usec = 0;
 }
 
-StreamParser::~StreamParser() {
+LStreamParser::~LStreamParser() {
   delete[] fBank[0]; delete[] fBank[1];
 }
 
-void StreamParser::saveParserState() {
+void LStreamParser::saveParserState() {
   fSavedParserIndex = fCurParserIndex;
   fSavedRemainingUnparsedBits = fRemainingUnparsedBits;
 }
 
-void StreamParser::restoreSavedParserState() {
+void LStreamParser::restoreSavedParserState() {
   fCurParserIndex = fSavedParserIndex;
   fRemainingUnparsedBits = fSavedRemainingUnparsedBits;
 }
 
-void StreamParser::skipBits(unsigned numBits) {
+void LStreamParser::skipBits(unsigned numBits) {
   if (numBits <= fRemainingUnparsedBits) {
     fRemainingUnparsedBits -= numBits;
   } else {
@@ -79,7 +79,7 @@ void StreamParser::skipBits(unsigned numBits) {
   }
 }
 
-unsigned StreamParser::getBits(unsigned numBits) {
+unsigned LStreamParser::getBits(unsigned numBits) {
   if (numBits <= fRemainingUnparsedBits) {
     unsigned char lastByte = *lastParsed();
     lastByte >>= (fRemainingUnparsedBits - numBits);
@@ -112,13 +112,13 @@ unsigned StreamParser::getBits(unsigned numBits) {
   }
 }
 
-unsigned StreamParser::bankSize() const {
+unsigned LStreamParser::bankSize() const {
   return BANK_SIZE;
 }
 
 #define NO_MORE_BUFFERED_INPUT 1
 
-void StreamParser::ensureValidBytes1(unsigned numBytesNeeded) {
+void LStreamParser::ensureValidBytes1(unsigned numBytesNeeded) {
   // We need to read some more bytes from the input source.
   // First, clarify how much data to ask for:
   unsigned maxInputFrameSize = fInputSource->maxFrameSize();
@@ -144,7 +144,7 @@ void StreamParser::ensureValidBytes1(unsigned numBytesNeeded) {
   if (fCurParserIndex + numBytesNeeded > BANK_SIZE) {
     // If this happens, it means that we have too much saved parser state.
     // To fix this, increase BANK_SIZE as appropriate.
-    fInputSource->envir() << "StreamParser internal error ("
+    fInputSource->envir() << "LStreamParser internal error ("
 			  << fCurParserIndex << " + "
 			  << numBytesNeeded << " > "
 			  << BANK_SIZE << ")\n";
@@ -161,20 +161,20 @@ void StreamParser::ensureValidBytes1(unsigned numBytesNeeded) {
   throw NO_MORE_BUFFERED_INPUT;
 }
 
-void StreamParser::afterGettingBytes(void* clientData,
+void LStreamParser::afterGettingBytes(void* clientData,
 				     unsigned numBytesRead,
 				     unsigned /*numTruncatedBytes*/,
 				     struct timeval presentationTime,
 				     unsigned /*durationInMicroseconds*/){
-  StreamParser* parser = (StreamParser*)clientData;
+  LStreamParser* parser = (LStreamParser*)clientData;
   if (parser != NULL) parser->afterGettingBytes1(numBytesRead, presentationTime);
 }
 
-void StreamParser::afterGettingBytes1(unsigned numBytesRead, struct timeval presentationTime) {
+void LStreamParser::afterGettingBytes1(unsigned numBytesRead, struct timeval presentationTime) {
   // Sanity check: Make sure we didn't get too many bytes for our bank:
   if (fTotNumValidBytes + numBytesRead > BANK_SIZE) {
     fInputSource->envir()
-      << "StreamParser::afterGettingBytes() warning: read "
+      << "LStreamParser::afterGettingBytes() warning: read "
       << numBytesRead << " bytes; expected no more than "
       << BANK_SIZE - fTotNumValidBytes << "\n";
   }
@@ -191,12 +191,12 @@ void StreamParser::afterGettingBytes1(unsigned numBytesRead, struct timeval pres
   fClientContinueFunc(fClientContinueClientData, ptr, numBytesRead, presentationTime);
 }
 
-void StreamParser::onInputClosure(void* clientData) {
-  StreamParser* parser = (StreamParser*)clientData;
+void LStreamParser::onInputClosure(void* clientData) {
+  LStreamParser* parser = (LStreamParser*)clientData;
   if (parser != NULL) parser->onInputClosure1();
 }
 
-void StreamParser::onInputClosure1() {
+void LStreamParser::onInputClosure1() {
   if (!fHaveSeenEOF) {
     // We're hitting EOF for the first time.  Set our 'EOF' flag, and continue parsing, as if we'd just read 0 bytes of data.
     // This allows the parser to re-parse any remaining unparsed data (perhaps while testing for EOF at the end):

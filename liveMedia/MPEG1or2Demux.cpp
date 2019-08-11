@@ -32,7 +32,7 @@ enum MPEGParseState {
   PARSING_PES_PACKET
 };
 
-class MPEGProgramStreamParser: public StreamParser {
+class MPEGProgramStreamParser: public LStreamParser {
 public:
   MPEGProgramStreamParser(MPEG1or2Demux* usingDemux, FramedSource* inputSource);
   virtual ~MPEGProgramStreamParser();
@@ -326,7 +326,7 @@ void MPEG1or2Demux::handleClosure(void* clientData) {
 
 MPEGProgramStreamParser::MPEGProgramStreamParser(MPEG1or2Demux* usingDemux,
 						 FramedSource* inputSource)
-  : StreamParser(inputSource, MPEG1or2Demux::handleClosure, usingDemux,
+  : LStreamParser(inputSource, MPEG1or2Demux::handleClosure, usingDemux,
 		 &MPEG1or2Demux::continueReadProcessing, usingDemux),
   fUsingDemux(usingDemux), fCurrentParseState(PARSING_PACK_HEADER) {
 }
@@ -458,7 +458,7 @@ void MPEGProgramStreamParser::parsePackHeader() {
     unsigned char pack_stuffing_length = getBits(3);
     skipBytes(pack_stuffing_length);
   } else { // unknown
-    fUsingDemux->envir() << "StreamParser::parsePack() saw strange byte following pack_start_code\n";
+    fUsingDemux->envir() << "LStreamParser::parsePack() saw strange byte following pack_start_code\n";
   }
 
   // Check for a System Header next:
@@ -486,7 +486,7 @@ void MPEGProgramStreamParser::parseSystemHeader() {
   // According to the MPEG-1 and MPEG-2 specs, "remaining_header_length" should be
   // at least 6 bytes.  Check this now:
   if (remaining_header_length < 6) {
-    fUsingDemux->envir() << "StreamParser::parseSystemHeader(): saw strange header_length: "
+    fUsingDemux->envir() << "LStreamParser::parseSystemHeader(): saw strange header_length: "
 			  << remaining_header_length << " < 6\n";
   }
   skipBytes(remaining_header_length);
@@ -685,7 +685,7 @@ unsigned char MPEGProgramStreamParser::parsePESPacket() {
     bytesSkipped = 0;
   }
   if (PES_packet_length < bytesSkipped) {
-    fUsingDemux->envir() << "StreamParser::parsePESPacket(): saw inconsistent PES_packet_length "
+    fUsingDemux->envir() << "LStreamParser::parsePESPacket(): saw inconsistent PES_packet_length "
 			  << PES_packet_length << " < "
 			  << bytesSkipped << "\n";
   } else {

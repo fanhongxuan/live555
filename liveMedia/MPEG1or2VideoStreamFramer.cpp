@@ -147,7 +147,7 @@ void MPEG1or2VideoStreamParser::reset() {
 
 void MPEG1or2VideoStreamParser::flushInput() {
   reset();
-  StreamParser::flushInput();
+  LStreamParser::flushInput();
   if (fCurrentParseState != PARSING_VIDEO_SEQUENCE_HEADER) {
     setParseState(PARSING_GOP_HEADER); // start from the next GOP
   }

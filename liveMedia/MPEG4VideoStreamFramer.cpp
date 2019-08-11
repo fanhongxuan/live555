@@ -181,7 +181,7 @@ void MPEG4VideoStreamParser::flushInput() {
   fPrevNewTotalTicks = 0;
   fPrevPictureCountDelta = 1;
 
-  StreamParser::flushInput();
+  LStreamParser::flushInput();
   if (fCurrentParseState != PARSING_VISUAL_OBJECT_SEQUENCE) {
     setParseState(PARSING_VISUAL_OBJECT_SEQUENCE); // later, change to GOV or VOP? #####
   }

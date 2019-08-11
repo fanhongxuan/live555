@@ -37,7 +37,7 @@ public:
   void setParamsFromHeader();
 };
 
-class AC3AudioStreamParser: public StreamParser {
+class AC3AudioStreamParser: public LStreamParser {
 public:
   AC3AudioStreamParser(AC3AudioStreamFramer* usingSource,
 			FramedSource* inputSource);
@@ -217,7 +217,7 @@ void AC3FrameParams::setParamsFromHeader() {
 AC3AudioStreamParser
 ::AC3AudioStreamParser(AC3AudioStreamFramer* usingSource,
 			FramedSource* inputSource)
-  : StreamParser(inputSource, FramedSource::handleClosure, usingSource,
+  : LStreamParser(inputSource, FramedSource::handleClosure, usingSource,
 		 &AC3AudioStreamFramer::handleNewData, usingSource),
     fUsingSource(usingSource), fHaveParsedAFrame(False),
     fSavedFrame(NULL), fSavedFrameSize(0) {

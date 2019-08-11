@@ -937,7 +937,7 @@ void H264or5VideoStreamParser::flushInput() {
   fHaveSeenFirstStartCode = False;
   fHaveSeenFirstByteOfNALUnit = False;
 
-  StreamParser::flushInput();
+  LStreamParser::flushInput();
 }
 
 unsigned H264or5VideoStreamParser::parse() {

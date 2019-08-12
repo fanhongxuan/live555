@@ -20,6 +20,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 
 #include "H264VideoFileSink.hh"
 #include "OutputFile.hh"
+#include "ByteStreamFileSource.hh"
 
 ////////// H264VideoFileSink //////////
 
@@ -37,10 +38,12 @@ H264VideoFileSink::~H264VideoFileSink() {
 H264VideoFileSink*
 H264VideoFileSink::createNew(UsageEnvironment& env, char const* fileName,
 			     char const* sPropParameterSetsStr,
-			     unsigned bufferSize, Boolean oneFilePerFrame) {
+			     unsigned bufferSize, Boolean oneFilePerFrame) 
+{
   do {
     FILE* fid;
-    char const* perFrameFileNamePrefix;
+        Logi("fileName:%s", fileName);
+        char const* perFrameFileNamePrefix;
     if (oneFilePerFrame) {
       // Create the fid for each frame
       fid = NULL;

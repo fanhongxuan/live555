@@ -166,11 +166,22 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
     // open the localinput file
     Logi("CreateNew fileName:%s", fileName);
     if (strstr(fileName, "localsdk") == fileName){
+        int ret = 0;
 #ifdef USE_LOCALSDK
         Logi("Call LOCALSDK_StartUp to bringup the device");
-        LOCALSDK_StartUp();
+        ret = LOCALSDK_StartUp();
+        if (ret != 0){
+            Loge("LOCALSDK_StartUp failed:%d", ret);
+        }
         Logi("Call LOCALSDK_GetDevInfo");
-        LOCALSDK_GetDevInfo(&theDeviceInfo);
+        ret = LOCALSDK_GetDevInfo(&theDeviceInfo);
+        if (ret != 0){
+            Loge("LOCALSDK_GetDevInfo failed:%d", ret);
+        }
+        ret = LOCALSDK_PlayBackInit(2);
+        if (ret != 0){
+            Loge("LOCALSDK_PlayBackInit failed:%d",ret);
+        }
 #endif
         
         // call localsdk api to get the filehandle
@@ -183,7 +194,6 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
         long handle = 0;
         int streamtype = 0;
         unsigned long dwUser = (unsigned long)newSource;
-        int ret = 0;
 #ifdef USE_LOCALSDK
         Logi("Call LOCALSDK_GetFileByNameV2");
         LOCALSDK_FINDINFOV2 findInfo;
@@ -217,14 +227,14 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
                                        dwUser, 
                                        &handle,
                                        streamtype);
+#else
+        handle = 2;
 #endif        
         if (ret != 0){
             Loge("LOCALSDK_GetFileByNameV2 failed(%d):(%s)", ret, fileName);
             return NULL;
         }
-        Logi("LocalSDK_GetFileByNameV2 return ok");
-        // todo:fanhongxan@gmail.com
-        // how to get the file info?
+        Logi("LocalSDK_GetFileByNameV2 ok, handle:%d, source:%p", (int)handle, newSource);
         // newSource->fFileSize = GetFileSize(fileName, fid);
         newSource->setFileHandle(handle);
         newSource->fFileSize = fileInfo.nSize * 1024;
@@ -336,20 +346,28 @@ void ByteStreamFileSource::fileReadableHandler(ByteStreamFileSource* source, int
 
 void ByteStreamFileSource::setFileHandle(long fileHandle)
 {
+    Logi("fileHandle:%d", (int)fileHandle);
     mlFileHandle = fileHandle;
-    pthread_cond_init(&mFrameBufferCond, NULL);
-    pthread_mutex_init(&mFrameBufferMutex, NULL);
+    pthread_cond_init(&mFrameBufferReadCond, NULL);
+    pthread_mutex_init(&mFrameBufferReadMutex, NULL);
+    pthread_cond_init(&mFrameBufferProcessCond, NULL);
+    pthread_mutex_init(&mFrameBufferProcessMutex, NULL);
 }
 
 void ByteStreamFileSource::addFrameBuffer(H264FrameBuffer *pBuffer)
 {
-    pthread_mutex_lock(&mFrameBufferMutex);
+    Logi("Enter");
+    if (0 == mlFileHandle){
+        Loge("Invalid fileHandle");
+    }
+    pthread_mutex_lock(&mFrameBufferReadMutex);
     mFrameBufferList.push_back(pBuffer);
-    pthread_mutex_unlock(&mFrameBufferMutex);
+    pthread_mutex_unlock(&mFrameBufferReadMutex);
+    pthread_cond_signal(&mFrameBufferProcessCond);
     if (mFrameBufferList.size() > 2){
         // wait on the event
         Logi("localsdk wait for the next peek event");
-        pthread_cond_wait(&mFrameBufferCond, &mFrameBufferMutex);
+        pthread_cond_wait(&mFrameBufferReadCond, &mFrameBufferReadMutex);
     }
 }
 
@@ -363,22 +381,24 @@ void ByteStreamFileSource::doReadFromFile() {
   }
 #ifdef READ_FROM_FILES_SYNCHRONOUSLY
 #ifdef USE_LOCALSDK
-    // todo:fanhongxan@gmail.com
-    // popup one frame from the framebuffer
-    if (mFrameBufferList.size() != 0){
-        H264FrameBuffer *pBuffer = NULL;
-        pthread_mutex_lock(&mFrameBufferMutex);
-        pBuffer = mFrameBufferList.front();
-        mFrameBufferList.pop_front();
-        pthread_mutex_unlock(&mFrameBufferMutex);
-        pthread_cond_signal(&mFrameBufferCond);
-        Logi("localsdk send the peek signal");
-        fFrameSize = pBuffer->nLength;
-        memcpy(fTo, pBuffer->pContent, fFrameSize);
-        delete(pBuffer);
-    }
-    else{
-        fFrameSize = 0;
+    while(1){
+        if (mFrameBufferList.size() != 0){
+            H264FrameBuffer *pBuffer = NULL;
+            pthread_mutex_lock(&mFrameBufferReadMutex);
+            pBuffer = mFrameBufferList.front();
+            mFrameBufferList.pop_front();
+            pthread_mutex_unlock(&mFrameBufferReadMutex);
+            pthread_cond_signal(&mFrameBufferReadCond);
+            Logi("localsdk send the peek signal");
+            fFrameSize = pBuffer->nLength;
+            memcpy(fTo, pBuffer->pContent, fFrameSize);
+            delete(pBuffer);
+            break;
+        }
+        else{
+            Logi("No frame valid, wait for the signal");
+            pthread_cond_wait(&mFrameBufferProcessCond, &mFrameBufferProcessMutex);
+        }
     }
 #else
     if (NULL != fFid){

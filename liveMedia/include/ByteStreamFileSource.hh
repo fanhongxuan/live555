@@ -87,8 +87,11 @@ private:
   // add by fanhongxuan@gmail.com
   long mlFileHandle;
   std::list<H264FrameBuffer *> mFrameBufferList;
-  pthread_mutex_t mFrameBufferMutex;
-  pthread_cond_t  mFrameBufferCond;
+  pthread_mutex_t mFrameBufferReadMutex;
+  pthread_cond_t  mFrameBufferReadCond;
+  pthread_mutex_t mFrameBufferProcessMutex;
+  pthread_cond_t mFrameBufferProcessCond;
+
   unsigned fPreferredFrameSize;
   unsigned fPlayTimePerFrame;
   Boolean fFidIsSeekable;

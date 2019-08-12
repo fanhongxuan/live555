@@ -80,17 +80,44 @@ static int buildFileInfoByName(LOCALSDK_FILE_DATA *pFileInfo, const char *pFileN
     // parse the filename, channel, startTime/stopTime, size info from the pFileName
     // format is channel/size/starttime/stoptime/name.264
     int i = 0;
-    int channel = 0, size = 0,starttime = 0, stoptime = 0;
-    int ret = sscanf(pFileName, "localsdk/%d/%d/%d/%d-%s", &channel, &size, &starttime, &stoptime, pFileInfo->sFileName);
+    int channel = 0, size = 0;
+    int ret = sscanf(pFileName, "localsdk/%d/%d/%04d-%02d-%02d-%02d-%02d-%02d/%04d-%02d-%02d-%02d-%02d-%02d/%s", 
+                     &channel, &size, 
+                     &pFileInfo->stBeginTime.year,
+                     &pFileInfo->stBeginTime.month,
+                     &pFileInfo->stBeginTime.day,
+                     &pFileInfo->stBeginTime.hour,
+                     &pFileInfo->stBeginTime.minute,
+                     &pFileInfo->stBeginTime.second,
+                     &pFileInfo->stEndTime.year,
+                     &pFileInfo->stEndTime.month,
+                     &pFileInfo->stEndTime.day,
+                     &pFileInfo->stEndTime.hour,
+                     &pFileInfo->stEndTime.minute,
+                     &pFileInfo->stEndTime.second,
+                     pFileInfo->sFileName);
     Logi("pFileName:%s(%s)", pFileName, pFileInfo->sFileName);
     char *ext = strstr(pFileInfo->sFileName, ".h264.264");
     if (NULL != ext){
         //pFileInfo->sFileName[strlen(pFileInfo->sFileName)- strlen(".264")] = 0;
-        pFileInfo->sFileName[ext - pFileInfo->sFileName] = 0;
+        pFileInfo->sFileName[ext - pFileInfo->sFileName + strlen(".h264")] = 0;
     }
     Logi("filename:%s", pFileInfo->sFileName);
-    Logi("channel:%d, size:%d kb, starttime:%d, stoptime:%d", channel, size, starttime, stoptime);
-    pFileInfo->nChannel = channel;
+    Logi("channel:%d, size:%d kb, starttime:%04d-%02d-%02dT%02d:%02d:%02dZ, stoptime:%04d-%02d-%02dT%02d:%02d:%02dZ", 
+         channel, size, 
+         pFileInfo->stBeginTime.year,
+         pFileInfo->stBeginTime.month,
+         pFileInfo->stBeginTime.day,
+         pFileInfo->stBeginTime.hour,
+         pFileInfo->stBeginTime.minute,
+         pFileInfo->stBeginTime.second,
+         pFileInfo->stEndTime.year,
+         pFileInfo->stEndTime.month,
+         pFileInfo->stEndTime.day,
+         pFileInfo->stEndTime.hour,
+         pFileInfo->stEndTime.minute,
+         pFileInfo->stEndTime.second);
+    pFileInfo->nChannel = channel-1;
     pFileInfo->nSize = size;
     // pFileInfo->nBeginTime;
     //pFileInfo->nEndTime;
@@ -102,6 +129,7 @@ static  int PlayBackCallBackV2(long lRealHandle,
                                SDK_H264_FRAME_INFO *pFrameInfo,
                                unsigned long dwUser)
 {
+    Logi("handle:%d, dwUser:%p", (int)lRealHandle, (void*)dwUser);
     ByteStreamFileSource *pSource = (ByteStreamFileSource *)(dwUser);
     H264FrameBuffer *pBuffer = new H264FrameBuffer();
     pBuffer->pHeader = pFrameInfo->pHeader;
@@ -119,6 +147,7 @@ static  int PlayBackCallBackV2(long lRealHandle,
 
 static int EndCallBack(long lRealHandle, unsigned long dwUser)
 {
+    Logi("handle:%d,dwUser:%p", (int)lRealHandle, (void*)dwUser);
     ByteStreamFileSource *pSource = (ByteStreamFileSource*)(dwUser);
 #ifdef USE_LOCALSDK    
     LOCALSDK_StopGetFile(lRealHandle);
@@ -137,7 +166,7 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
     // open the localinput file
     Logi("CreateNew fileName:%s", fileName);
     if (strstr(fileName, "localsdk") == fileName){
-#ifdef USE_LOCAL_SDK
+#ifdef USE_LOCALSDK
         Logi("Call LOCALSDK_StartUp to bringup the device");
         LOCALSDK_StartUp();
         Logi("Call LOCALSDK_GetDevInfo");
@@ -155,26 +184,50 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
         int streamtype = 0;
         unsigned long dwUser = (unsigned long)newSource;
         int ret = 0;
-#ifdef USE_LOCALSDK        
-        LOCALSDK_GetFileByNameV2(&fileInfo, 
-                                 PlayBackCallBackV2, 
-                                 dwUser, 	
-                                 EndCallBack, 
-                                 dwUser, 
-                                 &handle,
-                                 streamtype); 
-#else
-        handle = 2;
+#ifdef USE_LOCALSDK
+        Logi("Call LOCALSDK_GetFileByNameV2");
+        LOCALSDK_FINDINFOV2 findInfo;
+        LOCALSDK_FIND_FILE_RET findRet;
+        LOCALSDK_FILE_DATA fileData[1];
+        memset(&findRet, 0, sizeof(findRet));
+        memset(fileData, 0, sizeof(fileData[0]) * 1);
+        findRet.nMaxSize = 1;
+        findRet.nRetSize = 0;
+        findRet.pFileData = fileData;
+        memset(&findInfo, 0, sizeof(findInfo));
+        findInfo.nChannel = fileInfo.nChannel;
+        // todo:fanhongxan@gmail.com
+        // convert the type here.
+        findInfo.nFileType = 0x0f;
+        findInfo.nDriverTypes = 3; // record.
+        findInfo.StreamType = SDK_CAPTURE_CHN_MAIN;
+        findInfo.MaxFileNum = findRet.nMaxSize;
+        findInfo.stBeginTime = fileInfo.stBeginTime;
+        findInfo.stEndTime = fileInfo.stEndTime;
+        ret = LOCALSDK_FindFileV2(&findInfo, &findRet, 30);
+        if (ret != 0){
+            Loge("LOCALSDK_FindFileV2 faild:%d", ret);
+            return NULL;
+        }
+        Logi("LOCALSDK_FindFileV2: ret:%d", findRet.nRetSize);
+        ret = LOCALSDK_GetFileByNameV2(&findRet.pFileData[0], 
+                                       PlayBackCallBackV2, 
+                                       dwUser, 	
+                                       EndCallBack, 
+                                       dwUser, 
+                                       &handle,
+                                       streamtype);
 #endif        
         if (ret != 0){
             Loge("LOCALSDK_GetFileByNameV2 failed(%d):(%s)", ret, fileName);
             return NULL;
         }
+        Logi("LocalSDK_GetFileByNameV2 return ok");
         // todo:fanhongxan@gmail.com
         // how to get the file info?
         // newSource->fFileSize = GetFileSize(fileName, fid);
         newSource->setFileHandle(handle);
-        newSource->fFileSize = 102400;
+        newSource->fFileSize = fileInfo.nSize * 1024;
         return newSource;
     }
     FILE* fid = OpenInputFile(env, fileName);

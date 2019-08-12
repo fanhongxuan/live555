@@ -17,7 +17,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 // Copyright (c) 1996-2019 Live Networks, Inc.  All rights reserved.
 // A file source that is a plain byte stream (rather than frames)
 // Implementation
-
+#include <map>
 #include "ByteStreamFileSource.hh"
 #include "InputFile.hh"
 #include "GroupsockHelper.hh"
@@ -27,6 +27,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #define READ_FROM_FILES_SYNCHRONOUSLY
 void logBegin(const char *type, const char *file, const char *function, int line);
 void logEnd();
+
 #define Logi(...) do{logBegin("info" , __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
 #define Loge(...) do{logBegin("error", __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
 
@@ -36,6 +37,7 @@ public:
     unsigned char *pContent;
     unsigned long nLength;
     unsigned long nFrameLength;
+    unsigned long nOffset;
     unsigned int FrameType;
     unsigned int nSubType;
     unsigned int nEncodeType;
@@ -48,6 +50,7 @@ static pthread_mutex_t gLogMutex = PTHREAD_MUTEX_INITIALIZER;
 
 void logBegin(const char *type, const char *file, const char *function, int line)
 {
+    pthread_mutex_lock(&gLogMutex);
     time_t timevalue=time(NULL);
     struct tm t;
     memset(&t, 0, sizeof(t));
@@ -66,7 +69,6 @@ void logBegin(const char *type, const char *file, const char *function, int line
         file,
         function, 
         line);
-    pthread_mutex_lock(&gLogMutex);
 }
 
 void logEnd()
@@ -141,7 +143,9 @@ static  int PlayBackCallBackV2(long lRealHandle,
     pBuffer->nFrameRate = pFrameInfo->nFrameRate;
     pBuffer->nWidth = pFrameInfo->nWidth;
     pBuffer->nHeight = pFrameInfo->nHeight;
+    pBuffer->nOffset = 0;
     pSource->addFrameBuffer(pBuffer);
+    Logi("Leave");
     return 0;
 }
 
@@ -158,6 +162,8 @@ static int EndCallBack(long lRealHandle, unsigned long dwUser)
 
 static LOCALSDK_DEVICE_INFO_V2 theDeviceInfo;
 
+static std::map<ByteStreamFileSource *, long> theHandleMaps;
+
 ByteStreamFileSource*
 ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
 				unsigned preferredFrameSize,
@@ -167,22 +173,39 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
     Logi("CreateNew fileName:%s", fileName);
     if (strstr(fileName, "localsdk") == fileName){
         int ret = 0;
+        
+        if (theHandleMaps.empty()){
+#ifdef USE_LOCALSDK            
+            Logi("Call LOCALSDK_StartUp to bringup the device");
+            ret = LOCALSDK_StartUp();
+            if (ret != 0){
+                Loge("LOCALSDK_StartUp failed:%d", ret);
+            }
+            Logi("Call LOCALSDK_GetDevInfo");
+            ret = LOCALSDK_GetDevInfo(&theDeviceInfo);
+            if (ret != 0){
+                Loge("LOCALSDK_GetDevInfo failed:%d", ret);
+            }
+            ret = LOCALSDK_PlayBackInit(2);
+            if (ret != 0){
+                Loge("LOCALSDK_PlayBackInit failed:%d",ret);
+            }
+#endif            
+        }
+        else{
+            std::map<ByteStreamFileSource *, long>::iterator it = theHandleMaps.begin();
+            while(it != theHandleMaps.end()){
+                if ((it->first) != NULL && it->second != 0){
+                    Logi("Stop the previous opend file:%d", it->second);
 #ifdef USE_LOCALSDK
-        Logi("Call LOCALSDK_StartUp to bringup the device");
-        ret = LOCALSDK_StartUp();
-        if (ret != 0){
-            Loge("LOCALSDK_StartUp failed:%d", ret);
+                    LOCALSDK_StopGetFile(it->second);
+#endif    
+                    (it->first)->setFileHandle(0);
+                }
+                it++;
+            }
+            theHandleMaps.clear();
         }
-        Logi("Call LOCALSDK_GetDevInfo");
-        ret = LOCALSDK_GetDevInfo(&theDeviceInfo);
-        if (ret != 0){
-            Loge("LOCALSDK_GetDevInfo failed:%d", ret);
-        }
-        ret = LOCALSDK_PlayBackInit(2);
-        if (ret != 0){
-            Loge("LOCALSDK_PlayBackInit failed:%d",ret);
-        }
-#endif
         
         // call localsdk api to get the filehandle
         LOCALSDK_FILE_DATA fileInfo;
@@ -238,6 +261,7 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
         // newSource->fFileSize = GetFileSize(fileName, fid);
         newSource->setFileHandle(handle);
         newSource->fFileSize = fileInfo.nSize * 1024;
+        theHandleMaps[newSource] = handle;
         return newSource;
     }
     FILE* fid = OpenInputFile(env, fileName);
@@ -264,19 +288,20 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, FILE* fid,
 
 void ByteStreamFileSource::seekToByteAbsolute(u_int64_t byteNumber, u_int64_t numBytesToStream) {
   SeekFile64(fFid, (int64_t)byteNumber, SEEK_SET);
-
+    Logi("Enter:%d,%d", (int)byteNumber, (int)numBytesToStream);
   fNumBytesToStream = numBytesToStream;
   fLimitNumBytesToStream = fNumBytesToStream > 0;
 }
 
 void ByteStreamFileSource::seekToByteRelative(int64_t offset, u_int64_t numBytesToStream) {
   SeekFile64(fFid, offset, SEEK_CUR);
-
+    Logi("Enter:%d,%d", (int)offset, (int)numBytesToStream);
   fNumBytesToStream = numBytesToStream;
   fLimitNumBytesToStream = fNumBytesToStream > 0;
 }
 
 void ByteStreamFileSource::seekToEnd() {
+    Logi("Enter");
   SeekFile64(fFid, 0, SEEK_END);
 }
 
@@ -286,6 +311,12 @@ ByteStreamFileSource::ByteStreamFileSource(UsageEnvironment& env, FILE* fid,
   : FramedFileSource(env, fid), fFileSize(0), fPreferredFrameSize(preferredFrameSize),
     fPlayTimePerFrame(playTimePerFrame), fLastPlayTime(0), mlFileHandle(0),
     fHaveStartedReading(False), fLimitNumBytesToStream(False), fNumBytesToStream(0) {
+    
+    pthread_cond_init(&mFrameBufferReadCond, NULL);
+    pthread_mutex_init(&mFrameBufferReadMutex, NULL);
+    pthread_cond_init(&mFrameBufferProcessCond, NULL);
+    pthread_mutex_init(&mFrameBufferProcessMutex, NULL);
+    
 #ifndef READ_FROM_FILES_SYNCHRONOUSLY
   makeSocketNonBlocking(fileno(fFid));
 #endif
@@ -296,12 +327,16 @@ ByteStreamFileSource::ByteStreamFileSource(UsageEnvironment& env, FILE* fid,
 
 ByteStreamFileSource::~ByteStreamFileSource() {
   if (fFid == NULL) return;
-
+    Logi("Enter");
 #ifndef READ_FROM_FILES_SYNCHRONOUSLY
   envir().taskScheduler().turnOffBackgroundReadHandling(fileno(fFid));
 #endif
     if (0 != mlFileHandle){
-#ifdef USE_LOCALSDK        
+        std::map<ByteStreamFileSource *, long>::iterator it = theHandleMaps.find(this);
+        if (it != theHandleMaps.end()){
+            theHandleMaps.erase(it);
+        }
+#ifdef USE_LOCALSDK
         LOCALSDK_StopGetFile(mlFileHandle);
 #endif        
     }
@@ -309,6 +344,7 @@ ByteStreamFileSource::~ByteStreamFileSource() {
 }
 
 void ByteStreamFileSource::doGetNextFrame() {
+    Logi("Enter:%d", mlFileHandle);
     if (0 == mlFileHandle){
         if (feof(fFid) || ferror(fFid) || (fLimitNumBytesToStream && fNumBytesToStream == 0)) {
             handleClosure();
@@ -329,6 +365,7 @@ void ByteStreamFileSource::doGetNextFrame() {
 }
 
 void ByteStreamFileSource::doStopGettingFrames() {
+    Logi("Enter");
   envir().taskScheduler().unscheduleDelayedTask(nextTask());
 #ifndef READ_FROM_FILES_SYNCHRONOUSLY
   envir().taskScheduler().turnOffBackgroundReadHandling(fileno(fFid));
@@ -348,10 +385,6 @@ void ByteStreamFileSource::setFileHandle(long fileHandle)
 {
     Logi("fileHandle:%d", (int)fileHandle);
     mlFileHandle = fileHandle;
-    pthread_cond_init(&mFrameBufferReadCond, NULL);
-    pthread_mutex_init(&mFrameBufferReadMutex, NULL);
-    pthread_cond_init(&mFrameBufferProcessCond, NULL);
-    pthread_mutex_init(&mFrameBufferProcessMutex, NULL);
 }
 
 void ByteStreamFileSource::addFrameBuffer(H264FrameBuffer *pBuffer)
@@ -360,44 +393,61 @@ void ByteStreamFileSource::addFrameBuffer(H264FrameBuffer *pBuffer)
     if (0 == mlFileHandle){
         Loge("Invalid fileHandle");
     }
+    Logi("lock to push the frame");
     pthread_mutex_lock(&mFrameBufferReadMutex);
     mFrameBufferList.push_back(pBuffer);
     pthread_mutex_unlock(&mFrameBufferReadMutex);
+    Logi("frame is ok, notify the process to take it");
     pthread_cond_signal(&mFrameBufferProcessCond);
     if (mFrameBufferList.size() > 2){
         // wait on the event
         Logi("localsdk wait for the next peek event");
+        pthread_mutex_lock(&mFrameBufferReadMutex);
         pthread_cond_wait(&mFrameBufferReadCond, &mFrameBufferReadMutex);
+        pthread_mutex_unlock(&mFrameBufferReadMutex);
+        Logi("getting the next frame");
     }
 }
 
 void ByteStreamFileSource::doReadFromFile() {
+    Logi("enter");
   // Try to read as many bytes as will fit in the buffer provided (or "fPreferredFrameSize" if less)
-  if (fLimitNumBytesToStream && fNumBytesToStream < (u_int64_t)fMaxSize) {
-    fMaxSize = (unsigned)fNumBytesToStream;
-  }
-  if (fPreferredFrameSize > 0 && fPreferredFrameSize < fMaxSize) {
-    fMaxSize = fPreferredFrameSize;
-  }
+    if (fLimitNumBytesToStream && fNumBytesToStream < (u_int64_t)fMaxSize) {
+        fMaxSize = (unsigned)fNumBytesToStream;
+    }
+    if (fPreferredFrameSize > 0 && fPreferredFrameSize < fMaxSize) {
+        fMaxSize = fPreferredFrameSize;
+    }
 #ifdef READ_FROM_FILES_SYNCHRONOUSLY
 #ifdef USE_LOCALSDK
     while(1){
         if (mFrameBufferList.size() != 0){
-            H264FrameBuffer *pBuffer = NULL;
-            pthread_mutex_lock(&mFrameBufferReadMutex);
-            pBuffer = mFrameBufferList.front();
-            mFrameBufferList.pop_front();
-            pthread_mutex_unlock(&mFrameBufferReadMutex);
-            pthread_cond_signal(&mFrameBufferReadCond);
-            Logi("localsdk send the peek signal");
-            fFrameSize = pBuffer->nLength;
-            memcpy(fTo, pBuffer->pContent, fFrameSize);
-            delete(pBuffer);
+            H264FrameBuffer *pBuffer = mFrameBufferList.front();
+            fFrameSize = pBuffer->nLength -pBuffer->nOffset;
+            if (fFrameSize > fMaxSize){
+                fFrameSize = fMaxSize;
+            }
+            memcpy(fTo, pBuffer->pContent + pBuffer->nOffset, fFrameSize);
+            pBuffer->nOffset += fFrameSize;
+            if (pBuffer->nOffset >= pBuffer->nLength){
+                pthread_mutex_lock(&mFrameBufferReadMutex);
+                mFrameBufferList.pop_front();
+                pthread_mutex_unlock(&mFrameBufferReadMutex);
+                Logi("Get one frame, notify the callback to get next");
+                pthread_cond_signal(&mFrameBufferReadCond);
+                Logi("localsdk send the peek signal");
+                delete pBuffer;
+            }
+            else{
+                Logi("Has left some data for the next time process.");
+            }
             break;
         }
         else{
             Logi("No frame valid, wait for the signal");
+            pthread_mutex_lock(&mFrameBufferProcessMutex);
             pthread_cond_wait(&mFrameBufferProcessCond, &mFrameBufferProcessMutex);
+            pthread_mutex_unlock(&mFrameBufferProcessMutex);
         }
     }
 #else
@@ -417,6 +467,7 @@ void ByteStreamFileSource::doReadFromFile() {
     fFrameSize = read(fileno(fFid), fTo, fMaxSize);
   }
 #endif
+    Logi("process data");
   if (fFrameSize == 0) {
     handleClosure();
     return;

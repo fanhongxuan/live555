@@ -414,7 +414,7 @@ void ServerMediaSubsession::testScaleFactor(float& scale) {
 
 float ServerMediaSubsession::duration() const {
   // default implementation: assume an unbounded session:
-  return 1200.0;
+  return 0.0;
 }
 
 void ServerMediaSubsession::getAbsoluteTimeRange(char*& absStartTime, char*& absEndTime) const {

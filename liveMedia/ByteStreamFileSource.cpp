@@ -163,7 +163,7 @@ double GetFileDuration(const char *filename){
     time_t tEnd = mktime(&end);
     ret = (double)(tEnd - tStart);
     Logi("ret:%lf, timeRange:%d<-->%d, filename:%s", ret, tStart, tEnd, filename);
-    return ret;
+    return 600.0;
 }
 
 static  int PlayBackCallBackV2(long lRealHandle, 
@@ -561,7 +561,7 @@ void ByteStreamFileSource::doReadFromFile() {
         fFrameSize = fread(fTo, 1, fMaxSize, fFid);
     }
     else{
-        // Logi("fill a temp frame");
+        Logi("fill a temp frame:%d", fFrameSize);
         fFrameSize = fMaxSize;
     }
 #endif    

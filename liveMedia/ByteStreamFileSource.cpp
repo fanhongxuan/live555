@@ -33,9 +33,15 @@ void logEnd();
 
 class H264FrameBuffer{
 public:
-    unsigned char *pHeader;
+    H264FrameBuffer(){
+        pContent = NULL;
+    }
+    ~H264FrameBuffer(){
+        if (NULL != pContent){
+            delete []pContent;
+        }
+    }
     unsigned char *pContent;
-    unsigned long nLength;
     unsigned long nFrameLength;
     unsigned long nOffset;
     unsigned int FrameType;
@@ -134,9 +140,8 @@ static  int PlayBackCallBackV2(long lRealHandle,
     Logi("handle:%d, dwUser:%p", (int)lRealHandle, (void*)dwUser);
     ByteStreamFileSource *pSource = (ByteStreamFileSource *)(dwUser);
     H264FrameBuffer *pBuffer = new H264FrameBuffer();
-    pBuffer->pHeader = pFrameInfo->pHeader;
-    pBuffer->pContent = pFrameInfo->pContent;
-    pBuffer->nLength = pFrameInfo->nLength;
+    pBuffer->pContent = new unsigned char[pFrameInfo->nFrameLength];
+    memcpy(pBuffer->pContent, pFrameInfo->pContent, pFrameInfo->nFrameLength);
     pBuffer->nFrameLength = pFrameInfo->nFrameLength;
     pBuffer->FrameType = pFrameInfo->FrameType;
     pBuffer->nSubType = pFrameInfo->nSubType;
@@ -192,20 +197,20 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
             }
 #endif            
         }
-        else{
-            std::map<ByteStreamFileSource *, long>::iterator it = theHandleMaps.begin();
-            while(it != theHandleMaps.end()){
-                if ((it->first) != NULL && it->second != 0){
-                    Logi("Stop the previous opend file:%d", it->second);
-#ifdef USE_LOCALSDK
-                    LOCALSDK_StopGetFile(it->second);
-#endif    
-                    (it->first)->setFileHandle(0);
-                }
-                it++;
-            }
-            theHandleMaps.clear();
-        }
+        //         else{
+        //             std::map<ByteStreamFileSource *, long>::iterator it = theHandleMaps.begin();
+        //             while(it != theHandleMaps.end()){
+        //                 if ((it->first) != NULL && it->second != 0){
+        //                     Logi("Stop the previous opend file:%d", it->second);
+        // #ifdef USE_LOCALSDK
+        //                     LOCALSDK_StopGetFile(it->second);
+        // #endif    
+        //                     (it->first)->setFileHandle(0);
+        //                 }
+        //                 it++;
+        //             }
+        //             theHandleMaps.clear();
+        //         }
         
         // call localsdk api to get the filehandle
         LOCALSDK_FILE_DATA fileInfo;
@@ -418,18 +423,27 @@ void ByteStreamFileSource::doReadFromFile() {
     if (fPreferredFrameSize > 0 && fPreferredFrameSize < fMaxSize) {
         fMaxSize = fPreferredFrameSize;
     }
+    if (fMaxSize >= 10240){
+        fMaxSize = 10240;
+    }
 #ifdef READ_FROM_FILES_SYNCHRONOUSLY
 #ifdef USE_LOCALSDK
     while(1){
         if (mFrameBufferList.size() != 0){
             H264FrameBuffer *pBuffer = mFrameBufferList.front();
-            fFrameSize = pBuffer->nLength -pBuffer->nOffset;
+            fFrameSize = pBuffer->nFrameLength -pBuffer->nOffset;
             if (fFrameSize > fMaxSize){
                 fFrameSize = fMaxSize;
             }
+            Logi("Copy content to fTo, frameSize:%d, offset:%d, frameLength:%d", 
+                 fFrameSize, 
+                 pBuffer->nOffset,
+                 pBuffer->nFrameLength);
             memcpy(fTo, pBuffer->pContent + pBuffer->nOffset, fFrameSize);
+            Logi("After memcpy");
             pBuffer->nOffset += fFrameSize;
-            if (pBuffer->nOffset >= pBuffer->nLength){
+            if (pBuffer->nOffset >= pBuffer->nFrameLength){
+                Logi("Before lock");
                 pthread_mutex_lock(&mFrameBufferReadMutex);
                 mFrameBufferList.pop_front();
                 pthread_mutex_unlock(&mFrameBufferReadMutex);

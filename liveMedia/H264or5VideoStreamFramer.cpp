@@ -21,7 +21,8 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "H264or5VideoStreamFramer.hh"
 #include "MPEGVideoStreamParser.hh"
 #include "BitVector.hh"
-
+#include "ByteStreamFileSource.hh"
+#define DEBUG
 ////////// H264or5VideoStreamParser definition //////////
 
 class H264or5VideoStreamParser: public MPEGVideoStreamParser {
@@ -941,221 +942,238 @@ void H264or5VideoStreamParser::flushInput() {
 }
 
 unsigned H264or5VideoStreamParser::parse() {
-  try {
-    // The stream must start with a 0x00000001:
-    if (!fHaveSeenFirstStartCode) {
-      // Skip over any input bytes that precede the first 0x00000001:
-      u_int32_t first4Bytes;
-      while ((first4Bytes = test4Bytes()) != 0x00000001) {
-	get1Byte(); setParseState(); // ensures that we progress over bad data
-      }
-      skipBytes(4); // skip this initial code
-      
-      setParseState();
-      fHaveSeenFirstStartCode = True; // from now on
-    }
-    
-    if (fOutputStartCodeSize > 0 && curFrameSize() == 0 && !haveSeenEOF()) {
-      // Include a start code in the output:
-      save4Bytes(0x00000001);
-    }
-
-    // Then save everything up until the next 0x00000001 (4 bytes) or 0x000001 (3 bytes), or we hit EOF.
-    // Also make note of the first byte, because it contains the "nal_unit_type": 
-    if (haveSeenEOF()) {
-      // We hit EOF the last time that we tried to parse this data, so we know that any remaining unparsed data
-      // forms a complete NAL unit, and that there's no 'start code' at the end:
-      unsigned remainingDataSize = totNumValidBytes() - curOffset();
+    try {
+        // The stream must start with a 0x00000001:
+        if (!fHaveSeenFirstStartCode) {
+            // Skip over any input bytes that precede the first 0x00000001:
+            u_int32_t first4Bytes;
+            while ((first4Bytes = test4Bytes()) != 0x00000001) {
+                get1Byte(); setParseState(); // ensures that we progress over bad data
+            }
+            skipBytes(4); // skip this initial code
+            
+            setParseState();
+            Logi("Start a frame");
+            fHaveSeenFirstStartCode = True; // from now on
+        }
+        
+        if (fOutputStartCodeSize > 0 && curFrameSize() == 0 && !haveSeenEOF()) {
+            // Include a start code in the output:
+            save4Bytes(0x00000001);
+        }
+        
+        // Then save everything up until the next 0x00000001 (4 bytes) or 0x000001 (3 bytes), or we hit EOF.
+        // Also make note of the first byte, because it contains the "nal_unit_type": 
+        if (haveSeenEOF()) {
+            // We hit EOF the last time that we tried to parse this data, so we know that any remaining unparsed data
+            // forms a complete NAL unit, and that there's no 'start code' at the end:
+            unsigned remainingDataSize = totNumValidBytes() - curOffset();
 #ifdef DEBUG
-      unsigned const trailingNALUnitSize = remainingDataSize;
+            unsigned const trailingNALUnitSize = remainingDataSize;
 #endif
-      while (remainingDataSize > 0) {
-	u_int8_t nextByte = get1Byte();
-	if (!fHaveSeenFirstByteOfNALUnit) {
-	  fFirstByteOfNALUnit = nextByte;
-	  fHaveSeenFirstByteOfNALUnit = True;
-	}
-	saveByte(nextByte);
-	--remainingDataSize;
-      }
-
+            while (remainingDataSize > 0) {
+                u_int8_t nextByte = get1Byte();
+                if (!fHaveSeenFirstByteOfNALUnit) {
+                    fFirstByteOfNALUnit = nextByte;
+                    fHaveSeenFirstByteOfNALUnit = True;
+                }
+                saveByte(nextByte);
+                --remainingDataSize;
+            }
+            
 #ifdef DEBUG
-      if (fHNumber == 264) {
-	u_int8_t nal_ref_idc = (fFirstByteOfNALUnit&0x60)>>5;
-	u_int8_t nal_unit_type = fFirstByteOfNALUnit&0x1F;
-	fprintf(stderr, "Parsed trailing %d-byte NAL-unit (nal_ref_idc: %d, nal_unit_type: %d (\"%s\"))\n",
-		trailingNALUnitSize, nal_ref_idc, nal_unit_type, nal_unit_type_description_h264[nal_unit_type]);
-      } else { // 265
-	u_int8_t nal_unit_type = (fFirstByteOfNALUnit&0x7E)>>1;
-	fprintf(stderr, "Parsed trailing %d-byte NAL-unit (nal_unit_type: %d (\"%s\"))\n",
-		trailingNALUnitSize, nal_unit_type, nal_unit_type_description_h265[nal_unit_type]);
-      }
+            if (fHNumber == 264) {
+                u_int8_t nal_ref_idc = (fFirstByteOfNALUnit&0x60)>>5;
+                u_int8_t nal_unit_type = fFirstByteOfNALUnit&0x1F;
+                fprintf(stderr, "Parsed trailing %d-byte NAL-unit (nal_ref_idc: %d, nal_unit_type: %d (\"%s\"))\n",
+                        trailingNALUnitSize, nal_ref_idc, nal_unit_type, nal_unit_type_description_h264[nal_unit_type]);
+            } 
+            else 
+            { // 265
+                u_int8_t nal_unit_type = (fFirstByteOfNALUnit&0x7E)>>1;
+                fprintf(stderr, "Parsed trailing %d-byte NAL-unit (nal_unit_type: %d (\"%s\"))\n",
+                        trailingNALUnitSize, nal_unit_type, nal_unit_type_description_h265[nal_unit_type]);
+            }
 #endif
-
-      (void)get1Byte(); // forces another read, which will cause EOF to get handled for real this time
-      return 0;
-    } else {
-      u_int32_t next4Bytes = test4Bytes();
-      if (!fHaveSeenFirstByteOfNALUnit) {
-	fFirstByteOfNALUnit = next4Bytes>>24;
-	fHaveSeenFirstByteOfNALUnit = True;
-      }
-      while (next4Bytes != 0x00000001 && (next4Bytes&0xFFFFFF00) != 0x00000100) {
-	// We save at least some of "next4Bytes".
-	if ((unsigned)(next4Bytes&0xFF) > 1) {
-	  // Common case: 0x00000001 or 0x000001 definitely doesn't begin anywhere in "next4Bytes", so we save all of it:
-	  save4Bytes(next4Bytes);
-	  skipBytes(4);
-	} else {
-	  // Save the first byte, and continue testing the rest:
-	  saveByte(next4Bytes>>24);
-	  skipBytes(1);
-	}
-	setParseState(); // ensures forward progress
-	next4Bytes = test4Bytes();
-      }
-      // Assert: next4Bytes starts with 0x00000001 or 0x000001, and we've saved all previous bytes (forming a complete NAL unit).
-      // Skip over these remaining bytes, up until the start of the next NAL unit:
-      if (next4Bytes == 0x00000001) {
-	skipBytes(4);
-      } else {
-	skipBytes(3);
-      }
-    }
-
-    fHaveSeenFirstByteOfNALUnit = False; // for the next NAL unit that we'll parse
-    u_int8_t nal_unit_type;
-    if (fHNumber == 264) {
-      nal_unit_type = fFirstByteOfNALUnit&0x1F;
+            
+            (void)get1Byte(); // forces another read, which will cause EOF to get handled for real this time
+            return 0;
+        } 
+        else {
+            u_int32_t next4Bytes = test4Bytes();
+            if (!fHaveSeenFirstByteOfNALUnit) {
+                fFirstByteOfNALUnit = next4Bytes>>24;
+                fHaveSeenFirstByteOfNALUnit = True;
+            }
+            while (next4Bytes != 0x00000001 && (next4Bytes&0xFFFFFF00) != 0x00000100) {
+                // We save at least some of "next4Bytes".
+                if ((unsigned)(next4Bytes&0xFF) > 1) {
+                    // Common case: 0x00000001 or 0x000001 definitely doesn't begin anywhere in "next4Bytes", so we save all of it:
+                    save4Bytes(next4Bytes);
+                    skipBytes(4);
+                    } else {
+                    // Save the first byte, and continue testing the rest:
+                    saveByte(next4Bytes>>24);
+                    skipBytes(1);
+                }
+                setParseState(); // ensures forward progress
+                next4Bytes = test4Bytes();
+            }
+            // Assert: next4Bytes starts with 0x00000001 or 0x000001, and we've saved all previous bytes (forming a complete NAL unit).
+            // Skip over these remaining bytes, up until the start of the next NAL unit:
+            if (next4Bytes == 0x00000001) {
+                skipBytes(4);
+                } 
+            else {
+                skipBytes(3);
+            }
+        }
+        
+        fHaveSeenFirstByteOfNALUnit = False; // for the next NAL unit that we'll parse
+        u_int8_t nal_unit_type;
+        if (fHNumber == 264) {
+            nal_unit_type = fFirstByteOfNALUnit&0x1F;
 #ifdef DEBUG
-      u_int8_t nal_ref_idc = (fFirstByteOfNALUnit&0x60)>>5;
-      fprintf(stderr, "Parsed %d-byte NAL-unit (nal_ref_idc: %d, nal_unit_type: %d (\"%s\"))\n",
-	      curFrameSize()-fOutputStartCodeSize, nal_ref_idc, nal_unit_type, nal_unit_type_description_h264[nal_unit_type]);
+            u_int8_t nal_ref_idc = (fFirstByteOfNALUnit&0x60)>>5;
+            fprintf(stderr, "Parsed %d-byte NAL-unit (nal_ref_idc: %d, nal_unit_type: %d (\"%s\"))\n",
+                    curFrameSize()-fOutputStartCodeSize, nal_ref_idc, nal_unit_type, nal_unit_type_description_h264[nal_unit_type]);
 #endif
-    } else { // 265
-      nal_unit_type = (fFirstByteOfNALUnit&0x7E)>>1;
+        } 
+        else { // 265
+            nal_unit_type = (fFirstByteOfNALUnit&0x7E)>>1;
 #ifdef DEBUG
-      fprintf(stderr, "Parsed %d-byte NAL-unit (nal_unit_type: %d (\"%s\"))\n",
-	      curFrameSize()-fOutputStartCodeSize, nal_unit_type, nal_unit_type_description_h265[nal_unit_type]);
+            fprintf(stderr, "Parsed %d-byte NAL-unit (nal_unit_type: %d (\"%s\"))\n",
+                    curFrameSize()-fOutputStartCodeSize, nal_unit_type, nal_unit_type_description_h265[nal_unit_type]);
 #endif
-    }
-
+        }
+        
     // Now that we have found (& copied) a NAL unit, process it if it's of special interest to us:
-    if (isVPS(nal_unit_type)) { // Video parameter set
-      // First, save a copy of this NAL unit, in case the downstream object wants to see it:
-      usingSource()->saveCopyOfVPS(fStartOfFrame + fOutputStartCodeSize, curFrameSize() - fOutputStartCodeSize);
-
-      if (fParsedFrameRate == 0.0) {
-	// We haven't yet parsed a frame rate from the stream.
-	// So parse this NAL unit to check whether frame rate information is present:
-	unsigned num_units_in_tick, time_scale;
-	analyze_video_parameter_set_data(num_units_in_tick, time_scale);
-	if (time_scale > 0 && num_units_in_tick > 0) {
-	  usingSource()->fFrameRate = fParsedFrameRate
-	    = time_scale/(DeltaTfiDivisor*num_units_in_tick);
+        if (isVPS(nal_unit_type)) { // Video parameter set
+            // First, save a copy of this NAL unit, in case the downstream object wants to see it:
+            usingSource()->saveCopyOfVPS(fStartOfFrame + fOutputStartCodeSize, curFrameSize() - fOutputStartCodeSize);
+            
+            if (fParsedFrameRate == 0.0) {
+                // We haven't yet parsed a frame rate from the stream.
+                // So parse this NAL unit to check whether frame rate information is present:
+                unsigned num_units_in_tick, time_scale;
+                analyze_video_parameter_set_data(num_units_in_tick, time_scale);
+                if (time_scale > 0 && num_units_in_tick > 0) {
+                    usingSource()->fFrameRate = fParsedFrameRate
+                    = time_scale/(DeltaTfiDivisor*num_units_in_tick);
 #ifdef DEBUG
-	  fprintf(stderr, "Set frame rate to %f fps\n", usingSource()->fFrameRate);
+                    fprintf(stderr, "Set frame rate to %f fps\n", usingSource()->fFrameRate);
 #endif
-	} else {
+                } 
+                else {
 #ifdef DEBUG
-	  fprintf(stderr, "\tThis \"Video Parameter Set\" NAL unit contained no frame rate information, so we use a default frame rate of %f fps\n", usingSource()->fFrameRate);
+                    fprintf(stderr, "\tThis \"Video Parameter Set\" NAL unit contained no frame rate information, so we use a default frame rate of %f fps\n", usingSource()->fFrameRate);
 #endif
-	}
-      }
-    } else if (isSPS(nal_unit_type)) { // Sequence parameter set
-      // First, save a copy of this NAL unit, in case the downstream object wants to see it:
-      usingSource()->saveCopyOfSPS(fStartOfFrame + fOutputStartCodeSize, curFrameSize() - fOutputStartCodeSize);
-
-      if (fParsedFrameRate == 0.0) {
-	// We haven't yet parsed a frame rate from the stream.
-	// So parse this NAL unit to check whether frame rate information is present:
-	unsigned num_units_in_tick, time_scale;
-	analyze_seq_parameter_set_data(num_units_in_tick, time_scale);
-	if (time_scale > 0 && num_units_in_tick > 0) {
-	  usingSource()->fFrameRate = fParsedFrameRate
-	    = time_scale/(DeltaTfiDivisor*num_units_in_tick);
+                }
+            }
+        } 
+        else if (isSPS(nal_unit_type)) { // Sequence parameter set
+            // First, save a copy of this NAL unit, in case the downstream object wants to see it:
+            usingSource()->saveCopyOfSPS(fStartOfFrame + fOutputStartCodeSize, curFrameSize() - fOutputStartCodeSize);
+            
+            if (fParsedFrameRate == 0.0) {
+                // We haven't yet parsed a frame rate from the stream.
+                // So parse this NAL unit to check whether frame rate information is present:
+                unsigned num_units_in_tick, time_scale;
+                analyze_seq_parameter_set_data(num_units_in_tick, time_scale);
+                if (time_scale > 0 && num_units_in_tick > 0) {
+                    usingSource()->fFrameRate = fParsedFrameRate
+                    = time_scale/(DeltaTfiDivisor*num_units_in_tick);
 #ifdef DEBUG
-	  fprintf(stderr, "Set frame rate to %f fps\n", usingSource()->fFrameRate);
+                    fprintf(stderr, "Set frame rate to %f fps\n", usingSource()->fFrameRate);
 #endif
-	} else {
+                } 
+                else {
 #ifdef DEBUG
-	  fprintf(stderr, "\tThis \"Sequence Parameter Set\" NAL unit contained no frame rate information, so we use a default frame rate of %f fps\n", usingSource()->fFrameRate);
+                    fprintf(stderr, "\tThis \"Sequence Parameter Set\" NAL unit contained no frame rate information, so we use a default frame rate of %f fps\n", usingSource()->fFrameRate);
 #endif
-	}
-      }
-    } else if (isPPS(nal_unit_type)) { // Picture parameter set
-      // Save a copy of this NAL unit, in case the downstream object wants to see it:
-      usingSource()->saveCopyOfPPS(fStartOfFrame + fOutputStartCodeSize, curFrameSize() - fOutputStartCodeSize);
-    } else if (isSEI(nal_unit_type)) { // Supplemental enhancement information (SEI)
-      analyze_sei_data(nal_unit_type);
-      // Later, perhaps adjust "fPresentationTime" if we saw a "pic_timing" SEI payload??? #####
-    }
-
-    usingSource()->setPresentationTime();
+                }
+            }
+        } 
+        else if (isPPS(nal_unit_type)) { // Picture parameter set
+            // Save a copy of this NAL unit, in case the downstream object wants to see it:
+            usingSource()->saveCopyOfPPS(fStartOfFrame + fOutputStartCodeSize, curFrameSize() - fOutputStartCodeSize);
+        } 
+        else if (isSEI(nal_unit_type)) { // Supplemental enhancement information (SEI)
+            analyze_sei_data(nal_unit_type);
+            // Later, perhaps adjust "fPresentationTime" if we saw a "pic_timing" SEI payload??? #####
+        }
+        
+        usingSource()->setPresentationTime();
 #ifdef DEBUG
-    unsigned long secs = (unsigned long)usingSource()->fPresentationTime.tv_sec;
-    unsigned uSecs = (unsigned)usingSource()->fPresentationTime.tv_usec;
-    fprintf(stderr, "\tPresentation time: %lu.%06u\n", secs, uSecs);
+        unsigned long secs = (unsigned long)usingSource()->fPresentationTime.tv_sec;
+        unsigned uSecs = (unsigned)usingSource()->fPresentationTime.tv_usec;
+        fprintf(stderr, "\tPresentation time: %lu.%06u\n", secs, uSecs);
 #endif
-
-    // Now, check whether this NAL unit ends an 'access unit'.
-    // (RTP streamers need to know this in order to figure out whether or not to set the "M" bit.)
-    Boolean thisNALUnitEndsAccessUnit;
-    if (haveSeenEOF() || isEOF(nal_unit_type)) {
-      // There is no next NAL unit, so we assume that this one ends the current 'access unit':
-      thisNALUnitEndsAccessUnit = True;
-    } else if (usuallyBeginsAccessUnit(nal_unit_type)) {
-      // These NAL units usually *begin* an access unit, so assume that they don't end one here:
-      thisNALUnitEndsAccessUnit = False;
-    } else {
-      // We need to check the *next* NAL unit to figure out whether
-      // the current NAL unit ends an 'access unit':
-      u_int8_t firstBytesOfNextNALUnit[3];
-      testBytes(firstBytesOfNextNALUnit, 3);
-
-      u_int8_t const& next_nal_unit_type = fHNumber == 264
-	? (firstBytesOfNextNALUnit[0]&0x1F) : ((firstBytesOfNextNALUnit[0]&0x7E)>>1);
-      if (isVCL(next_nal_unit_type)) {
-	// The high-order bit of the byte after the "nal_unit_header" tells us whether it's
-	// the start of a new 'access unit' (and thus the current NAL unit ends an 'access unit'):
-	u_int8_t const byteAfter_nal_unit_header
-	  = fHNumber == 264 ? firstBytesOfNextNALUnit[1] : firstBytesOfNextNALUnit[2];
-	thisNALUnitEndsAccessUnit = (byteAfter_nal_unit_header&0x80) != 0;
-      } else if (usuallyBeginsAccessUnit(next_nal_unit_type)) {
-	// The next NAL unit's type is one that usually appears at the start of an 'access unit',
-	// so we assume that the current NAL unit ends an 'access unit':
-	thisNALUnitEndsAccessUnit = True;
-      } else {
-	// The next NAL unit definitely doesn't start a new 'access unit',
-	// which means that the current NAL unit doesn't end one:
-	thisNALUnitEndsAccessUnit = False;
-      }
-    }
+        
+        // Now, check whether this NAL unit ends an 'access unit'.
+        // (RTP streamers need to know this in order to figure out whether or not to set the "M" bit.)
+        Boolean thisNALUnitEndsAccessUnit;
+        if (haveSeenEOF() || isEOF(nal_unit_type)) {
+            // There is no next NAL unit, so we assume that this one ends the current 'access unit':
+            thisNALUnitEndsAccessUnit = True;
+        } 
+        else if (usuallyBeginsAccessUnit(nal_unit_type)) {
+            // These NAL units usually *begin* an access unit, so assume that they don't end one here:
+            thisNALUnitEndsAccessUnit = False;
+        } 
+        else {
+            // We need to check the *next* NAL unit to figure out whether
+            // the current NAL unit ends an 'access unit':
+            u_int8_t firstBytesOfNextNALUnit[3];
+            testBytes(firstBytesOfNextNALUnit, 3);
+            
+            u_int8_t const& next_nal_unit_type = fHNumber == 264
+            ? (firstBytesOfNextNALUnit[0]&0x1F) : ((firstBytesOfNextNALUnit[0]&0x7E)>>1);
+            if (isVCL(next_nal_unit_type)) {
+                // The high-order bit of the byte after the "nal_unit_header" tells us whether it's
+                // the start of a new 'access unit' (and thus the current NAL unit ends an 'access unit'):
+                u_int8_t const byteAfter_nal_unit_header
+                = fHNumber == 264 ? firstBytesOfNextNALUnit[1] : firstBytesOfNextNALUnit[2];
+                thisNALUnitEndsAccessUnit = (byteAfter_nal_unit_header&0x80) != 0;
+            } 
+            else if (usuallyBeginsAccessUnit(next_nal_unit_type)) {
+                // The next NAL unit's type is one that usually appears at the start of an 'access unit',
+                // so we assume that the current NAL unit ends an 'access unit':
+                thisNALUnitEndsAccessUnit = True;
+            } 
+            else {
+                // The next NAL unit definitely doesn't start a new 'access unit',
+                // which means that the current NAL unit doesn't end one:
+                thisNALUnitEndsAccessUnit = False;
+            }
+        }
 	
-    if (thisNALUnitEndsAccessUnit) {
+        if (thisNALUnitEndsAccessUnit) {
 #ifdef DEBUG
-      fprintf(stderr, "*****This NAL unit ends the current access unit*****\n");
+            fprintf(stderr, "*****This NAL unit ends the current access unit*****\n");
 #endif
-      usingSource()->fPictureEndMarker = True;
-      ++usingSource()->fPictureCount;
+            usingSource()->fPictureEndMarker = True;
+            ++usingSource()->fPictureCount;
+            
+            // Note that the presentation time for the next NAL unit will be different:
+            struct timeval& nextPT = usingSource()->fNextPresentationTime; // alias
+            nextPT = usingSource()->fPresentationTime;
+            double nextFraction = nextPT.tv_usec/1000000.0 + 1/usingSource()->fFrameRate;
+            unsigned nextSecsIncrement = (long)nextFraction;
+            nextPT.tv_sec += (long)nextSecsIncrement;
+            nextPT.tv_usec = (long)((nextFraction - nextSecsIncrement)*1000000);
+        }
+        Logi("after parse:%d", curFrameSize());
+        setParseState();
 
-      // Note that the presentation time for the next NAL unit will be different:
-      struct timeval& nextPT = usingSource()->fNextPresentationTime; // alias
-      nextPT = usingSource()->fPresentationTime;
-      double nextFraction = nextPT.tv_usec/1000000.0 + 1/usingSource()->fFrameRate;
-      unsigned nextSecsIncrement = (long)nextFraction;
-      nextPT.tv_sec += (long)nextSecsIncrement;
-      nextPT.tv_usec = (long)((nextFraction - nextSecsIncrement)*1000000);
+        return curFrameSize();
+    } 
+    catch (int /*e*/) {
+#ifdef DEBUG
+        fprintf(stderr, "H264or5VideoStreamParser::parse() EXCEPTION (This is normal behavior - *not* an error)\n");
+#endif
+        return 0;  // the parsing got interrupted
     }
-    setParseState();
-
-    return curFrameSize();
-  } catch (int /*e*/) {
-#ifdef DEBUG
-    fprintf(stderr, "H264or5VideoStreamParser::parse() EXCEPTION (This is normal behavior - *not* an error)\n");
-#endif
-    return 0;  // the parsing got interrupted
-  }
 }
 
 unsigned removeH264or5EmulationBytes(u_int8_t* to, unsigned toMaxSize,

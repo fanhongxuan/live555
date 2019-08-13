@@ -351,7 +351,12 @@ void ByteStreamFileSource::seekToRange(double &rangeStart)
          fileInfo.stBeginTime.minute,
          fileInfo.stBeginTime.second);
 #ifdef USE_LOCALSDK
-    LOCALSDK_SetSeekPlayBack(&fileInfo);
+    int ret = LOCALSDK_SetSeekPlayBack(&fileInfo);
+    if (ret != 0){
+        Loge("LOCALSDK_SetSeekPlayBack failed:%d", ret);
+        return;
+    }
+    Logi("LoCALSDK_SetSeekPlayBack ok");
 #endif    
 }
 

@@ -22,8 +22,8 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 
 #include <string.h>
 #include <stdlib.h>
-
-#define BANK_SIZE 150000
+#include "ByteStreamFileSource.hh"
+#define BANK_SIZE 300000
 
 void LStreamParser::flushInput() {
   fCurParserIndex = fSavedParserIndex = 0;
@@ -131,6 +131,7 @@ void LStreamParser::ensureValidBytes1(unsigned numBytesNeeded) {
     unsigned numBytesToSave = fTotNumValidBytes - fSavedParserIndex;
     unsigned char const* from = &curBank()[fSavedParserIndex];
 
+        Logi("fCurParserIndex:%d, fSavedParserIndex:%d", fCurParserIndex, fSavedParserIndex);
     fCurBankNum = (fCurBankNum + 1)%2;
     fCurBank = fBank[fCurBankNum];
     memmove(curBank(), from, numBytesToSave);
@@ -138,12 +139,14 @@ void LStreamParser::ensureValidBytes1(unsigned numBytesNeeded) {
     fSavedParserIndex = 0;
     fTotNumValidBytes = numBytesToSave;
   }
-
   // ASSERT: fCurParserIndex + numBytesNeeded > fTotNumValidBytes
   //      && fCurParserIndex + numBytesNeeded <= BANK_SIZE
   if (fCurParserIndex + numBytesNeeded > BANK_SIZE) {
     // If this happens, it means that we have too much saved parser state.
     // To fix this, increase BANK_SIZE as appropriate.
+        Loge("fSavedParserIndex:%d", fSavedParserIndex);
+        Loge("fTotNumValidBytes:%d", fTotNumValidBytes);
+        Loge("fCurBankNum:%d", fCurBankNum);
     fInputSource->envir() << "LStreamParser internal error ("
 			  << fCurParserIndex << " + "
 			  << numBytesNeeded << " > "

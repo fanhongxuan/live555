@@ -248,7 +248,7 @@ char* ServerMediaSession::generateSDPDescription() {
     // Unless subsessions have differing durations, we also have a "a=range:" line:
     float dur = duration();
     // add by fanhongxuan@gmail.com
-    dur = 600.0;
+    // dur = 600.0;
     // add by fanhongxuan@gmail.com end
     if (dur == 0.0) {
       rangeLine = strDup("a=range:npt=0-\r\n");
@@ -266,7 +266,7 @@ char* ServerMediaSession::generateSDPDescription() {
       "s=%s\r\n"
       "i=%s\r\n"
       /*modified by fanhongxuan@gmail.com*/
-      "t=0 600\r\n"
+      "t=0 0\r\n"
       "a=tool:%s%s\r\n"
       "a=type:broadcast\r\n"
       "a=control:*\r\n"
@@ -414,7 +414,7 @@ void ServerMediaSubsession::testScaleFactor(float& scale) {
 
 float ServerMediaSubsession::duration() const {
   // default implementation: assume an unbounded session:
-  return 0.0;
+  return 1200.0;
 }
 
 void ServerMediaSubsession::getAbsoluteTimeRange(char*& absStartTime, char*& absEndTime) const {
@@ -453,7 +453,7 @@ ServerMediaSubsession::rangeSDPLine() const {
   // Use our own duration for a "a=range:" line:
   float ourDuration = duration();
   // add by fanhongxuan@gmail.com
-  ourDuration = 600.0;
+  // ourDuration = 600.0;
   if (ourDuration == 0.0) {
     return strDup("a=range:npt=0-\r\n");
   } else {

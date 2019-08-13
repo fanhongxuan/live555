@@ -24,6 +24,13 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "Base64.hh"
 #include <GroupsockHelper.hh>
 
+// add by fanhongxuan@gmail.com
+void logBegin(const char *type, const char *file, const char *function, int line);
+void logEnd();
+
+#define Logi(...) do{logBegin("info" , __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
+#define Loge(...) do{logBegin("error", __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
+
 ////////// RTSPServer implementation //////////
 
 RTSPServer*
@@ -1611,7 +1618,8 @@ void RTSPServer::RTSPClientSession
 
 void RTSPServer::RTSPClientSession
 ::handleCmd_PLAY(RTSPServer::RTSPClientConnection* ourClientConnection,
-		 ServerMediaSubsession* subsession, char const* fullRequestStr) {
+		 ServerMediaSubsession* subsession, char const* fullRequestStr) 
+{
   char* rtspURL
     = fOurRTSPServer.rtspURL(fOurServerMediaSession, ourClientConnection->fClientInputSocket);
   unsigned rtspURLSize = strlen(rtspURL);
@@ -1695,12 +1703,12 @@ void RTSPServer::RTSPClientSession
 	}
 	if (absStart != NULL) {
 	  // Special case handling for seeking by 'absolute' time:
-	
+                    Logi("seekStream:absStart:%s, absEnd:%s", absStart, absEnd);
 	  fStreamStates[i].subsession->seekStream(fOurSessionId, fStreamStates[i].streamToken, absStart, absEnd);
 	} else {
 	  // Seeking by relative (NPT) time:
 	  
-	  u_int64_t numBytes;
+	  u_int64_t numBytes = 0;
 	  if (!sawRangeHeader || startTimeIsNow) {
 	    // We're resuming streaming without seeking, so we just do a 'null' seek
 	    // (to get our NPT, and to specify when to end streaming):
@@ -1716,6 +1724,12 @@ void RTSPServer::RTSPClientSession
 	      if (streamDuration < 0.0) streamDuration = -streamDuration;
 	          // should happen only if scale < 0.0
 	    }
+                        Logi("seekStream:duration:%f, rangeStart:%lf, rangeEnd:%lf, streamDuration:%ld, numBytes:%d", 
+                             duration,
+                             rangeStart, 
+                             rangeEnd,
+                             streamDuration, 
+                             (int)numBytes);
 	    fStreamStates[i].subsession->seekStream(fOurSessionId, fStreamStates[i].streamToken,
 						    rangeStart, streamDuration, numBytes);
 	  }
@@ -1755,8 +1769,8 @@ void RTSPServer::RTSPClientSession
     }
 
     // add by fanhongxuan@gmail.com
-    rangeStart = 0.0;
-    rangeEnd = 600.0;
+    // rangeStart = 0.0;
+    // rangeEnd = 600.0;
     if (rangeEnd == 0.0 && scale >= 0.0) {
       sprintf(buf, "Range: npt=%.3f-\r\n", rangeStart);
     } else {

@@ -54,6 +54,24 @@ void H264VideoFileServerMediaSubsession::testScaleFactor(float& scale)
    }
 }
 
+extern double GetFileDuration(const char *filename);
+float H264VideoFileServerMediaSubsession::duration() const {
+    double ret = GetFileDuration(fFileName);
+    Logi("filename:%s, ret:%lf", fFileName, ret);
+    // temp
+    // ret = 600.0;
+    return ret;
+}
+
+// void H264VideoFileServerMediaSubsession::seekStream(unsigned clientSessionId,
+//                                                     void* streamToken, double& rangeStart, double streamDuration, u_int64_t& numBytes) 
+// {
+//     Logi("rangeStart:%lf", rangeStart);
+//     // default implementation: do nothing
+//     numBytes = 0;
+// }
+
+
 static void afterPlayingDummy(void* clientData) {
   H264VideoFileServerMediaSubsession* subsess = (H264VideoFileServerMediaSubsession*)clientData;
   subsess->afterPlayingDummy1();

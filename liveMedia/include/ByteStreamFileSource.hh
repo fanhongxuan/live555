@@ -59,9 +59,10 @@ public:
     // if "numBytesToStream" is >0, then we limit the stream to that number of bytes, before treating it as EOF
   void seekToByteRelative(int64_t offset, u_int64_t numBytesToStream = 0);
   void seekToEnd(); // to force EOF handling on the next read
-
+  void seekToRange(double &range);
   // add by fanhongxuan@gmail.com
   void setFileHandle(long fileHandle);
+  void setFileName(const char *pFileName);
   void addFrameBuffer(H264FrameBuffer *pBuffer);
 protected:
   ByteStreamFileSource(UsageEnvironment& env,
@@ -91,6 +92,7 @@ private:
   pthread_cond_t  mFrameBufferReadCond;
   pthread_mutex_t mFrameBufferProcessMutex;
   pthread_cond_t mFrameBufferProcessCond;
+  char *mpFileName;
 
   unsigned fPreferredFrameSize;
   unsigned fPlayTimePerFrame;

@@ -23,6 +23,9 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include <GroupsockHelper.hh>
 
 #include "ByteStreamFileSource.hh"
+#include "MPEGVideoStreamFramer.hh"
+#include "MPEG2TransportStreamMultiplexor.hh"
+
 OnDemandServerMediaSubsession
 ::OnDemandServerMediaSubsession(UsageEnvironment& env,
 				Boolean reuseFirstSource,
@@ -249,9 +252,11 @@ void OnDemandServerMediaSubsession::pauseStream(unsigned /*clientSessionId*/,
 }
 
 void OnDemandServerMediaSubsession::seekStream(unsigned /*clientSessionId*/,
-					       void* streamToken, double& seekNPT, double streamDuration, u_int64_t& numBytes) {
-  numBytes = 0; // by default: unknown
+					       void* streamToken, double& seekNPT, double streamDuration, u_int64_t& numBytes) 
+{
+    numBytes = 0; // by default: unknown
 
+    Logi("seekStream:%d seekNPT");
   // Seeking isn't allowed if multiple clients are receiving data from the same source:
   if (fReuseFirstSource) return;
 
@@ -376,10 +381,20 @@ char const* OnDemandServerMediaSubsession
   return rtpSink == NULL ? NULL : rtpSink->auxSDPLine();
 }
 
-void OnDemandServerMediaSubsession::seekStreamSource(FramedSource* /*inputSource*/,
-						     double& /*seekNPT*/, double /*streamDuration*/, u_int64_t& numBytes) {
-  // Default implementation: Do nothing
-  numBytes = 0;
+void OnDemandServerMediaSubsession::seekStreamSource(FramedSource* inputSource,
+                                                     double& seekNPT, double streamDuration, u_int64_t& numBytes) 
+{
+    Logi("seekNPT:%lf, %p, name:%s", seekNPT, inputSource, inputSource->name());
+    MPEGVideoStreamFramer *pMpeg = dynamic_cast<MPEGVideoStreamFramer*>(inputSource);
+    if (NULL != pMpeg){
+        ByteStreamFileSource *pInput = dynamic_cast<ByteStreamFileSource *>(pMpeg->inputSource());
+        if (NULL != pInput){
+            Logi("Call ByteStreamFileSource seekRange");
+            pInput->seekToRange(seekNPT);
+        }
+    }
+    Logi("output seekNPT:%lf", seekNPT);
+    numBytes = 0;
 }
 
 void OnDemandServerMediaSubsession::seekStreamSource(FramedSource* /*inputSource*/,
@@ -524,6 +539,7 @@ StreamState::StreamState(OnDemandServerMediaSubsession& master,
 }
 
 StreamState::~StreamState() {
+    Logi("Enter");
   reclaim();
 }
 

@@ -35,6 +35,9 @@ public:
   void checkForAuxSDPLine1();
   void afterPlayingDummy1();
   virtual void testScaleFactor(float& scale);
+  virtual float duration() const;
+  // void seekStream(unsigned clientSessionId, void* streamToken, double& rangeStart, double streamDuration, u_int64_t& numBytes);
+
 protected:
   H264VideoFileServerMediaSubsession(UsageEnvironment& env,
 				      char const* fileName, Boolean reuseFirstSource);

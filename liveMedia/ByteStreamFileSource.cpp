@@ -87,23 +87,22 @@ static int buildFileInfoByName(LOCALSDK_FILE_DATA *pFileInfo, const char *pFileN
     // todo:fanhongxan@gmail.com
     // parse the filename, channel, startTime/stopTime, size info from the pFileName
     // format is channel/size/starttime/stoptime/name.264
-    int i = 0;
     int channel = 0, size = 0;
-    int ret = sscanf(pFileName, "localsdk/%d/%d/%04d-%02d-%02d-%02d-%02d-%02d/%04d-%02d-%02d-%02d-%02d-%02d/%s", 
-                     &channel, &size, 
-                     &pFileInfo->stBeginTime.year,
-                     &pFileInfo->stBeginTime.month,
-                     &pFileInfo->stBeginTime.day,
-                     &pFileInfo->stBeginTime.hour,
-                     &pFileInfo->stBeginTime.minute,
-                     &pFileInfo->stBeginTime.second,
-                     &pFileInfo->stEndTime.year,
-                     &pFileInfo->stEndTime.month,
-                     &pFileInfo->stEndTime.day,
-                     &pFileInfo->stEndTime.hour,
-                     &pFileInfo->stEndTime.minute,
-                     &pFileInfo->stEndTime.second,
-                     pFileInfo->sFileName);
+    sscanf(pFileName, "localsdk/%d/%d/%04d-%02d-%02d-%02d-%02d-%02d/%04d-%02d-%02d-%02d-%02d-%02d/%s", 
+           &channel, &size, 
+           &pFileInfo->stBeginTime.year,
+           &pFileInfo->stBeginTime.month,
+           &pFileInfo->stBeginTime.day,
+           &pFileInfo->stBeginTime.hour,
+           &pFileInfo->stBeginTime.minute,
+           &pFileInfo->stBeginTime.second,
+           &pFileInfo->stEndTime.year,
+           &pFileInfo->stEndTime.month,
+           &pFileInfo->stEndTime.day,
+           &pFileInfo->stEndTime.hour,
+           &pFileInfo->stEndTime.minute,
+           &pFileInfo->stEndTime.second,
+           pFileInfo->sFileName);
     Logi("pFileName:%s(%s)", pFileName, pFileInfo->sFileName);
     char *ext = strstr(pFileInfo->sFileName, ".h264.264");
     if (NULL != ext){
@@ -162,8 +161,8 @@ double GetFileDuration(const char *filename){
     time_t tStart = mktime(&start);
     time_t tEnd = mktime(&end);
     ret = (double)(tEnd - tStart);
-    Logi("ret:%lf, timeRange:%d<-->%d, filename:%s", ret, tStart, tEnd, filename);
-    return 600.0;
+    Logi("ret:%lf, timeRange:%d<-->%d, filename:%s", ret, (int)tStart, (int)tEnd, filename);
+    return ret;
 }
 
 static  int PlayBackCallBackV2(long lRealHandle, 
@@ -198,8 +197,6 @@ static int EndCallBack(long lRealHandle, unsigned long dwUser)
     return 0;
 }
 
-static LOCALSDK_DEVICE_INFO_V2 theDeviceInfo;
-
 ByteStreamFileSource*
 ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
 				unsigned preferredFrameSize,
@@ -212,6 +209,7 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
 #ifdef USE_LOCALSDK
         static int gbInit = 0;
         if (gbInit == 0){
+            LOCALSDK_DEVICE_INFO_V2 theDeviceInfo;
             Logi("Call LOCALSDK_StartUp to bringup the device");
             ret = LOCALSDK_StartUp();
             if (ret != 0){
@@ -239,9 +237,9 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, char const* fileName,
         buildFileInfoByName(&fileInfo, fileName);
         ByteStreamFileSource* newSource = new ByteStreamFileSource(env, NULL, preferredFrameSize, playTimePerFrame);
         long handle = 0;
+#ifdef USE_LOCALSDK
         int streamtype = 0;
         unsigned long dwUser = (unsigned long)newSource;
-#ifdef USE_LOCALSDK
         Logi("Call LOCALSDK_GetFileByNameV2");
         LOCALSDK_FINDINFOV2 findInfo;
         LOCALSDK_FIND_FILE_RET findRet;
@@ -319,7 +317,7 @@ void ByteStreamFileSource::seekToRange(double &rangeStart)
         return;
     }
     if (rangeStart <= 0.01){
-        Logi("Invalid rangeStart:%lf");
+        Logi("Invalid rangeStart:%lf", rangeStart);
         return;
     }
     // build the file info from the filename;
@@ -334,7 +332,7 @@ void ByteStreamFileSource::seekToRange(double &rangeStart)
     time_t start = mktime(&begin);
     start += (int)rangeStart;
     if (start >= tEnd){
-        Logi("Invalid target:%d, end(%d)", (int)start, tEnd);
+        Logi("Invalid target:%d, end(%d)", (int)start, (int)tEnd);
         rangeStart = .0;
         return;
     }
@@ -412,7 +410,10 @@ ByteStreamFileSource::~ByteStreamFileSource() {
 #endif
         Logi("LOCALSDK_StopGetFile ret:%d", ret);
     }
-    
+    if (NULL != mpFileName){
+        free(mpFileName);
+        mpFileName = NULL;
+    }
     if (fFid == NULL) return;
 #ifndef READ_FROM_FILES_SYNCHRONOUSLY
   envir().taskScheduler().turnOffBackgroundReadHandling(fileno(fFid));

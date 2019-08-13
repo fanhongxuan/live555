@@ -318,6 +318,10 @@ void ByteStreamFileSource::seekToRange(double &rangeStart)
         Logi("No filename ignore the seek request");
         return;
     }
+    if (rangeStart <= 0.01){
+        Logi("Invalid rangeStart:%lf");
+        return;
+    }
     // build the file info from the filename;
     LOCALSDK_FILE_DATA fileInfo;
     memset(&fileInfo, 0, sizeof(fileInfo));

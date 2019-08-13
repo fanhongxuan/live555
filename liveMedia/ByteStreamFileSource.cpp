@@ -314,6 +314,10 @@ ByteStreamFileSource::createNew(UsageEnvironment& env, FILE* fid,
 void ByteStreamFileSource::seekToRange(double &rangeStart)
 {
     Logi("seekToRangeStart:%lf", rangeStart);
+    if (NULL == mpFileName){
+        Logi("No filename ignore the seek request");
+        return;
+    }
     // build the file info from the filename;
     LOCALSDK_FILE_DATA fileInfo;
     memset(&fileInfo, 0, sizeof(fileInfo));
@@ -345,7 +349,7 @@ void ByteStreamFileSource::seekToRange(double &rangeStart)
          fileInfo.stBeginTime.minute,
          fileInfo.stBeginTime.second);
 #ifdef USE_LOCALSDK
-    LOCALSDK_SetSeekPlayBack();
+    LOCALSDK_SetSeekPlayBack(&fileInfo);
 #endif    
 }
 

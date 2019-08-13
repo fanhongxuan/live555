@@ -1589,7 +1589,9 @@ void RTSPServer::RTSPClientSession
 
 void RTSPServer::RTSPClientSession
 ::handleCmd_TEARDOWN(RTSPServer::RTSPClientConnection* ourClientConnection,
-		     ServerMediaSubsession* subsession) {
+		     ServerMediaSubsession* subsession) 
+{
+    Logi("Enter");
   unsigned i;
   for (i = 0; i < fNumStreamStates; ++i) {
     if (subsession == NULL /* means: aggregated operation */

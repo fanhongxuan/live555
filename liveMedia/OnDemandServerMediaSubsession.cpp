@@ -349,7 +349,9 @@ void OnDemandServerMediaSubsession
 }
 
 void OnDemandServerMediaSubsession::deleteStream(unsigned clientSessionId,
-						 void*& streamToken) {
+						 void*& streamToken) 
+{
+    Logi("Enter");
   StreamState* streamState = (StreamState*)streamToken;
 
   // Look up (and remove) the destinations for this client session:

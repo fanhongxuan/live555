@@ -21,8 +21,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "H264or5VideoStreamFramer.hh"
 #include "MPEGVideoStreamParser.hh"
 #include "BitVector.hh"
-#include "ByteStreamFileSource.hh"
-#define DEBUG
+// #define DEBUG
 ////////// H264or5VideoStreamParser definition //////////
 
 class H264or5VideoStreamParser: public MPEGVideoStreamParser {
@@ -953,7 +952,7 @@ unsigned H264or5VideoStreamParser::parse() {
             skipBytes(4); // skip this initial code
             
             setParseState();
-            Logi("Start a frame");
+            // Logi("Start a frame");
             fHaveSeenFirstStartCode = True; // from now on
         }
         
@@ -1163,7 +1162,7 @@ unsigned H264or5VideoStreamParser::parse() {
             nextPT.tv_sec += (long)nextSecsIncrement;
             nextPT.tv_usec = (long)((nextFraction - nextSecsIncrement)*1000000);
         }
-        Logi("after parse:%d", curFrameSize());
+        // Logi("after parse:%d", curFrameSize());
         setParseState();
 
         return curFrameSize();

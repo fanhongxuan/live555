@@ -506,6 +506,7 @@ void ByteStreamFileSource::addFrameBuffer(H264FrameBuffer *pBuffer)
     Logi("Enter");
     if (0 == mlFileHandle){
         Loge("Invalid fileHandle");
+        delete pBuffer;
         return;
     }
     if (mbSeeked){
@@ -514,6 +515,7 @@ void ByteStreamFileSource::addFrameBuffer(H264FrameBuffer *pBuffer)
         }
         else{
             Loge("Waiting for the next I-FRAME:%d, %d", pBuffer->FrameType, pBuffer->nSubType);
+            delete pBuffer;
             return;
         }
     }

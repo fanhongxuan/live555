@@ -157,6 +157,12 @@ double GetFileDuration(const char *filename){
     time_t tEnd = mktime(&end);
     ret = (double)(tEnd - tStart);
     Logi("ret:%lf, timeRange:%d<-->%d, filename:%s", ret, (int)tStart, (int)tEnd, filename);
+#ifndef USE_LOCALSDK    
+    if (ret <= 0.01){
+        Loge("Temp code, set the duration of the rtsp stream to 600 seconds:%s", filename);
+        ret = 600.0;
+    }
+#endif    
     return ret;
 }
 

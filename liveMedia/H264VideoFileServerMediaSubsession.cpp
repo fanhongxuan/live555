@@ -50,7 +50,7 @@ void H264VideoFileServerMediaSubsession::testScaleFactor(float& scale)
 {
    if (scale >= 0.01){
      gRTSPScale = scale;
-     printf("Set H264 scale to %f\n", gRTSPScale);
+     Logi("Set H264 scale to %f\n", gRTSPScale);
    }
 }
 

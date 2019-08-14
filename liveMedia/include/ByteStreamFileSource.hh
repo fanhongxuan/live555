@@ -94,6 +94,7 @@ private:
   pthread_mutex_t mFrameBufferProcessMutex;
   pthread_cond_t mFrameBufferProcessCond;
   char *mpFileName;
+  bool mbSeeked;
 
   unsigned fPreferredFrameSize;
   unsigned fPlayTimePerFrame;

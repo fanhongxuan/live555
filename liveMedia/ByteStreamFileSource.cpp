@@ -356,6 +356,7 @@ void ByteStreamFileSource::seekToRange(double &rangeStart)
         return;
     }
     Logi("LoCALSDK_SetSeekPlayBack ok");
+    mbSeeked = true;
 #endif    
 }
 
@@ -387,6 +388,8 @@ ByteStreamFileSource::ByteStreamFileSource(UsageEnvironment& env, FILE* fid,
     
     mpFileName = NULL;
     mlFileHandle = 0;
+    mbSeeked = false;
+    
     pthread_cond_init(&mFrameBufferReadCond, NULL);
     pthread_mutex_init(&mFrameBufferReadMutex, NULL);
     pthread_cond_init(&mFrameBufferProcessCond, NULL);
@@ -498,6 +501,15 @@ void ByteStreamFileSource::addFrameBuffer(H264FrameBuffer *pBuffer)
     if (0 == mlFileHandle){
         Loge("Invalid fileHandle");
         return;
+    }
+    if (mbSeeked){
+        if (pBuffer->FrameType == FRAME_VIDEO && pBuffer->nSubType == I_FRAME){
+            mbSeeked = false;
+        }
+        else{
+            Loge("Waiting for the next I-FRAME:%d, %d", pBuffer->FrameType, pBuffer->nSubType);
+            return;
+        }
     }
     Logi("lock to push the frame");
     pthread_mutex_lock(&mFrameBufferReadMutex);

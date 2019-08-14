@@ -19,6 +19,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 // Implementation
 
 #include "DynamicRTSPServer.hh"
+#include "Log.h"
 #include <liveMedia.hh>
 #include <string.h>
 
@@ -49,7 +50,7 @@ ServerMediaSession* DynamicRTSPServer
   // First, check whether the specified "streamName" exists as a local file:
   FILE* fid = fopen(streamName, "rb");
   Boolean fileExists = fid != NULL;
-  printf("streamName:%s\n", streamName);
+  Logi("streamName:%s\n", streamName);
   if ((!fileExists) && strstr(streamName, "localsdk") != NULL){
       fileExists = true;
   }
@@ -76,7 +77,7 @@ ServerMediaSession* DynamicRTSPServer
 
     if (sms == NULL) {
       sms = createNewSMS(envir(), streamName, fid); 
-      printf("before call addServerMediaSession\n");
+      Logi("before call addServerMediaSession\n");
       addServerMediaSession(sms);
     }
     if (NULL != fid){

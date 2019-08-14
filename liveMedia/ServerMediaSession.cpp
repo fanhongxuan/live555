@@ -22,6 +22,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 // Implementation
 
 #include "ServerMediaSession.hh"
+#include "Log.h"
 #include <GroupsockHelper.hh>
 #include <math.h>
 #if defined(__WIN32__) || defined(_WIN32) || defined(_QNX4)
@@ -119,9 +120,9 @@ void ServerMediaSession::testScaleFactor(float& scale) {
   for (subsession = fSubsessionsHead; subsession != NULL;
        subsession = subsession->fNext) {
     float ssscale = scale;
-    printf("before call subsession->testScaleFactor:%f\n", ssscale);
+    Logi("before call subsession->testScaleFactor:%f\n", ssscale);
     subsession->testScaleFactor(ssscale);
-    printf("after call subsession->testScaleFactor:%f\n", ssscale);
+    Logi("after call subsession->testScaleFactor:%f\n", ssscale);
     if (subsession == fSubsessionsHead) { // this is the first subsession
       minSSScale = maxSSScale = bestSSScale = ssscale;
       bestDistanceTo1 = (float)fabs(ssscale - 1.0f);

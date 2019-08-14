@@ -20,7 +20,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 
 #include "RTPSink.hh"
 #include "GroupsockHelper.hh"
-
+#include "Log.h"
 ////////// RTPSink //////////
 
 Boolean RTPSink::lookupByName(UsageEnvironment& env, char const* sinkName,
@@ -60,7 +60,7 @@ RTPSink::RTPSink(UsageEnvironment& env,
   // add by fanhongxuan@gmail.com
   if (g_support_vlc == True){
     // If need support VLC, change the payloadFormatName to MP2P.
-    printf("fRTPPayloadFormatName:%s, rtpTimestampFrequency:%d\n", fRTPPayloadFormatName, rtpTimestampFrequency);
+    Logi("fRTPPayloadFormatName:%s, rtpTimestampFrequency:%d\n", fRTPPayloadFormatName, rtpTimestampFrequency);
     fRTPPayloadFormatName = strDup("MP2P");
   }
   gettimeofday(&fCreationTime, NULL);

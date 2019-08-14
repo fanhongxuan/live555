@@ -21,7 +21,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 
 #include "MultiFramedRTPSink.hh"
 #include "GroupsockHelper.hh"
-
+#include "Log.h"
 ////////// MultiFramedRTPSink //////////
 
 void MultiFramedRTPSink::setPacketSizes(unsigned preferredPacketSize,
@@ -405,7 +405,7 @@ void MultiFramedRTPSink::sendPacketIfNecessary() {
   fNumFramesUsedSoFar = 0;
 
   if (fNoFramesLeft) {
-    printf("****************Call onSourceClosure\n");
+    Logi("****************Call onSourceClosure\n");
     // We're done:
     onSourceClosure();
   } else {

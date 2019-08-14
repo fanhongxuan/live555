@@ -23,13 +23,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "RTSPRegisterSender.hh"
 #include "Base64.hh"
 #include <GroupsockHelper.hh>
-
-// add by fanhongxuan@gmail.com
-void logBegin(const char *type, const char *file, const char *function, int line);
-void logEnd();
-
-#define Logi(...) do{logBegin("info" , __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
-#define Loge(...) do{logBegin("error", __FILE__, __FUNCTION__, __LINE__);printf(__VA_ARGS__); logEnd();}while(0)
+#include "Log.h"
 
 ////////// RTSPServer implementation //////////
 
@@ -1629,16 +1623,16 @@ void RTSPServer::RTSPClientSession
   // Parse the client's "Scale:" header, if any:
   float scale = .0;
   Boolean sawScaleHeader = parseScaleHeader(fullRequestStr, scale);
-  printf("fanhongxuan:request scale:%f\n", scale);
+  Logi("fanhongxuan:request scale:%f\n", scale);
   // Try to set the stream's scale factor to this value:
   if (subsession == NULL /*aggregate op*/) {
-    printf("call fOurServerMediaSession->testScaleFactor\n");
+    Logi("call fOurServerMediaSession->testScaleFactor\n");
     fOurServerMediaSession->testScaleFactor(scale);
   } else {
-    printf("call subsession->testScaleFactor\n");
+    Logi("call subsession->testScaleFactor\n");
     subsession->testScaleFactor(scale);
   }
-  printf("reply scale:%f\n", scale);
+  Logi("reply scale:%f\n", scale);
   char buf[100];
   char* scaleHeader;
   if (!sawScaleHeader) {
@@ -1837,7 +1831,7 @@ void RTSPServer::RTSPClientSession
 	   rangeHeader,
 	   fOurSessionId,
 	   rtpInfo);
-  printf("scaleHeader:%s\n", scaleHeader);
+  Logi("scaleHeader:%s\n", scaleHeader);
   delete[] rtpInfo; delete[] rangeHeader;
   delete[] scaleHeader; delete[] rtspURL;
 }

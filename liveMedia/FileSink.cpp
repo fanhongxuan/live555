@@ -25,7 +25,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "FileSink.hh"
 #include "GroupsockHelper.hh"
 #include "OutputFile.hh"
-
+#include "Log.h"
 ////////// FileSink //////////
 
 FileSink::FileSink(UsageEnvironment& env, FILE* fid, unsigned bufferSize,
@@ -136,7 +136,7 @@ void FileSink::afterGettingFrame(unsigned frameSize,
   addData(fBuffer, frameSize, presentationTime);
 
   if (fOutFid == NULL || fflush(fOutFid) == EOF) {
-    printf("******** onSourceClosure\n");
+    Logi("******** onSourceClosure\n");
     // The output file has closed.  Handle this the same way as if the input source had closed:
     if (fSource != NULL) fSource->stopGettingFrames();
     onSourceClosure();

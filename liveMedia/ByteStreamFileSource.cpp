@@ -171,6 +171,10 @@ static  int PlayBackCallBackV2(long lRealHandle,
 {
     Logi("handle:%d, dwUser:%p", (int)lRealHandle, (void*)dwUser);
     ByteStreamFileSource *pSource = (ByteStreamFileSource *)(dwUser);
+    if (pFrameInfo->nFrameLength == 0){
+        Loge("Invalid nFrameLength:%d", pFrameInfo->nFrameLength);
+        return 0;
+    }
     H264FrameBuffer *pBuffer = new H264FrameBuffer();
     pBuffer->pContent = new unsigned char[pFrameInfo->nFrameLength];
     memcpy(pBuffer->pContent, pFrameInfo->pContent, pFrameInfo->nFrameLength);
@@ -525,9 +529,9 @@ void ByteStreamFileSource::doReadFromFile() {
     if (fPreferredFrameSize > 0 && fPreferredFrameSize < fMaxSize) {
         fMaxSize = fPreferredFrameSize;
     }
-    if (fMaxSize >= 10240){
-        fMaxSize = 10240;
-    }
+    // if (fMaxSize >= 10240){
+    //     fMaxSize = 10240;
+    // }
 #ifdef READ_FROM_FILES_SYNCHRONOUSLY
 #ifdef USE_LOCALSDK
     while(1){

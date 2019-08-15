@@ -21,6 +21,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 
 #include "MPEG2TransportFileServerMediaSubsession.hh"
 #include "SimpleRTPSink.hh"
+#include "Log.h"
 
 MPEG2TransportFileServerMediaSubsession*
 MPEG2TransportFileServerMediaSubsession::createNew(UsageEnvironment& env,
@@ -148,6 +149,7 @@ void MPEG2TransportFileServerMediaSubsession
   }
 
   // Call the original, default version of this routine:
+    Logi("Call OnDemandServerMediaSubsession deleteStream");
   OnDemandServerMediaSubsession::deleteStream(clientSessionId, streamToken);
 }
 

@@ -24,7 +24,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "Base64.hh"
 #include <GroupsockHelper.hh>
 #include "Log.h"
-
+// #define DEBUG
 ////////// RTSPServer implementation //////////
 
 RTSPServer*
@@ -254,6 +254,7 @@ void RTSPServer::stopTCPStreamingOnSocket(int socketNum) {
       RTSPClientSession* clientSession
 	= (RTSPServer::RTSPClientSession*)lookupClientSession(sotcp->fSessionId);
       if (clientSession != NULL) {
+                Logi("Call deleteStream");
 	clientSession->deleteStreamByTrack(sotcp->fTrackNum);
       }
 
@@ -342,6 +343,17 @@ void RTSPServer::RTSPClientConnection
     // while we're using it:
     session->incrementReferenceCount();
 
+        // add by fanhongxuan@gmail.com
+        ServerMediaSubsessionIterator iter(*session);
+        ServerMediaSubsession* subsession = NULL;
+        struct sockaddr_in sourceAddr; SOCKLEN_T namelen = sizeof(sourceAddr);
+        getsockname(fClientInputSocket, (struct sockaddr*)&sourceAddr, &namelen);
+        while ((subsession = iter.next()) != NULL){
+            Logi("setServerAddressAndPortForSDP:[%p](%s)0x%04X", subsession, sourceAddrStr.val(), sourceAddr.sin_addr.s_addr);
+            subsession->setServerAddressAndPortForSDP(sourceAddr.sin_addr.s_addr, 0);
+        }
+        
+    
     // Then, assemble a SDP description for this session:
     sdpDescription = session->generateSDPDescription();
     if (sdpDescription == NULL) {
@@ -616,7 +628,7 @@ void RTSPServer::RTSPClientConnection::handleRequestBytes(int newBytesRead) {
       // Either the client socket has died, or the request was too big for us.
       // Terminate this connection:
 #ifdef DEBUG
-      fprintf(stderr, "RTSPClientConnection[%p]::handleRequestBytes() read %d new bytes (of %d); terminating connection!\n", this, newBytesRead, fRequestBufferBytesLeft);
+            Loge("RTSPClientConnection[%p]::handleRequestBytes() read %d new bytes (of %d); terminating connection!", this, newBytesRead, fRequestBufferBytesLeft);
 #endif
       fIsActive = False;
       break;
@@ -626,8 +638,8 @@ void RTSPServer::RTSPClientConnection::handleRequestBytes(int newBytesRead) {
     unsigned char* ptr = &fRequestBuffer[fRequestBytesAlreadySeen];
 #ifdef DEBUG
     ptr[newBytesRead] = '\0';
-    fprintf(stderr, "RTSPClientConnection[%p]::handleRequestBytes() %s %d new bytes:%s\n",
-	    this, numBytesRemaining > 0 ? "processing" : "read", newBytesRead, ptr);
+        Loge("RTSPClientConnection[%p]::handleRequestBytes() %s %d new bytes:%s",
+             this, numBytesRemaining > 0 ? "processing" : "read", newBytesRead, ptr);
 #endif
     
     if (fClientOutputSocket != fClientInputSocket && numBytesRemaining == 0) {
@@ -652,8 +664,8 @@ void RTSPServer::RTSPClientConnection::handleRequestBytes(int newBytesRead) {
 	unsigned decodedSize;
 	unsigned char* decodedBytes = base64Decode((char const*)(ptr-fBase64RemainderCount), numBytesToDecode, decodedSize);
 #ifdef DEBUG
-	fprintf(stderr, "Base64-decoded %d input bytes into %d new bytes:", numBytesToDecode, decodedSize);
-	for (unsigned k = 0; k < decodedSize; ++k) fprintf(stderr, "%c", decodedBytes[k]);
+             Loge("Base64-decoded %d input bytes into %d new bytes:", numBytesToDecode, decodedSize);
+                for (unsigned k = 0; k < decodedSize; ++k) fprintf(stderr, "%c", decodedBytes[k]);
 	fprintf(stderr, "\n");
 #endif
 	
@@ -713,13 +725,13 @@ void RTSPServer::RTSPClientConnection::handleRequestBytes(int newBytesRead) {
     // Check first for a bogus "Content-Length" value that would cause a pointer wraparound:
     if (tmpPtr + 2 + contentLength < tmpPtr + 2) {
 #ifdef DEBUG
-      fprintf(stderr, "parseRTSPRequestString() returned a bogus \"Content-Length:\" value: 0x%x (%d)\n", contentLength, (int)contentLength);
+            Loge("parseRTSPRequestString() returned a bogus \"Content-Length:\" value: 0x%x (%d)", contentLength, (int)contentLength);
 #endif
       parseSucceeded = False;
     }
     if (parseSucceeded) {
 #ifdef DEBUG
-      fprintf(stderr, "parseRTSPRequestString() succeeded, returning cmdName \"%s\", urlPreSuffix \"%s\", urlSuffix \"%s\", CSeq \"%s\", Content-Length %u, with %d bytes following the message.\n", cmdName, urlPreSuffix, urlSuffix, cseq, contentLength, ptr + newBytesRead - (tmpPtr + 2));
+      Loge("parseRTSPRequestString() succeeded, returning cmdName \"%s\", urlPreSuffix \"%s\", urlSuffix \"%s\", CSeq \"%s\", Content-Length %u, with %d bytes following the message.", cmdName, urlPreSuffix, urlSuffix, cseq, contentLength, ptr + newBytesRead - (tmpPtr + 2));
 #endif
       // If there was a "Content-Length:" header, then make sure we've received all of the data that it specified:
       if (ptr + newBytesRead < tmpPtr + 2 + contentLength) break; // we still need more data; subsequent reads will give it to us 
@@ -775,6 +787,7 @@ void RTSPServer::RTSPClientConnection::handleRequestBytes(int newBytesRead) {
 	  if (authenticationOK("SETUP", urlTotalSuffix, (char const*)fRequestBuffer)) {
 	    clientSession
 	      = (RTSPServer::RTSPClientSession*)fOurRTSPServer.createNewClientSessionWithId();
+                        Logi("createNewClientSessionWithId:%p", clientSession);
 	  } else {
 	    areAuthenticated = False;
 	  }
@@ -817,7 +830,7 @@ void RTSPServer::RTSPClientConnection::handleRequestBytes(int newBytesRead) {
       }
     } else {
 #ifdef DEBUG
-      fprintf(stderr, "parseRTSPRequestString() failed; checking now for HTTP commands (for RTSP-over-HTTP tunneling)...\n");
+            Loge("parseRTSPRequestString() failed; checking now for HTTP commands (for RTSP-over-HTTP tunneling)...");
 #endif
       // The request was not (valid) RTSP, but check for a special case: HTTP commands (for setting up RTSP-over-HTTP tunneling):
       char sessionCookie[RTSP_PARAM_STRING_MAX];
@@ -830,7 +843,7 @@ void RTSPServer::RTSPClientConnection::handleRequestBytes(int newBytesRead) {
       *fLastCRLF = '\r';
       if (parseSucceeded) {
 #ifdef DEBUG
-	fprintf(stderr, "parseHTTPRequestString() succeeded, returning cmdName \"%s\", urlSuffix \"%s\", sessionCookie \"%s\", acceptStr \"%s\"\n", cmdName, urlSuffix, sessionCookie, acceptStr);
+                Loge("parseHTTPRequestString() succeeded, returning cmdName \"%s\", urlSuffix \"%s\", sessionCookie \"%s\", acceptStr \"%s\"", cmdName, urlSuffix, sessionCookie, acceptStr);
 #endif
 	// Check that the HTTP command is valid for RTSP-over-HTTP tunneling: There must be a 'session cookie'.
 	Boolean isValidHTTPCmd = True;
@@ -864,14 +877,14 @@ void RTSPServer::RTSPClientConnection::handleRequestBytes(int newBytesRead) {
 	}
       } else {
 #ifdef DEBUG
-	fprintf(stderr, "parseHTTPRequestString() failed!\n");
+                Loge("parseHTTPRequestString() failed!");
 #endif
-	handleCmd_bad();
+                handleCmd_bad();
       }
     }
     
 #ifdef DEBUG
-    fprintf(stderr, "sending response: %s", fResponseBuffer);
+    Loge("sending response: %s", fResponseBuffer);
 #endif
     send(fClientOutputSocket, (char const*)fResponseBuffer, strlen((char*)fResponseBuffer), 0);
     
@@ -895,8 +908,14 @@ void RTSPServer::RTSPClientConnection::handleRequestBytes(int newBytesRead) {
   
   --fRecursionCount;
   if (!fIsActive) {
-    if (fRecursionCount > 0) closeSockets(); else delete this;
-    // Note: The "fRecursionCount" test is for a pathological situation where we reenter the event loop and get called recursively
+        if (fRecursionCount > 0){
+            closeSockets(); 
+        }
+        else {
+            Logi("delete this %p", this);
+            delete this;
+        }
+        // Note: The "fRecursionCount" test is for a pathological situation where we reenter the event loop and get called recursively
     // while handling a command (e.g., while handling a "DESCRIBE", to get a SDP description).
     // In such a case we don't want to actually delete ourself until we leave the outermost call.
   }
@@ -1131,12 +1150,14 @@ RTSPServer::RTSPClientSession
 }
 
 RTSPServer::RTSPClientSession::~RTSPClientSession() {
+    Logi("Enter:%p", this);
   reclaimStreamStates();
 }
 
 void RTSPServer::RTSPClientSession::deleteStreamByTrack(unsigned trackNum) {
   if (trackNum >= fNumStreamStates) return; // sanity check; shouldn't happen
   if (fStreamStates[trackNum].subsession != NULL) {
+        Logi("Call deleteStream");
     fStreamStates[trackNum].subsession->deleteStream(fOurSessionId, fStreamStates[trackNum].streamToken);
     fStreamStates[trackNum].subsession = NULL;
   }
@@ -1149,13 +1170,16 @@ void RTSPServer::RTSPClientSession::deleteStreamByTrack(unsigned trackNum) {
       break;
     }
   }
+    Logi("noSubsessionsRemain:%d", noSubsessionsRemain);
   if (noSubsessionsRemain) delete this;
 }
 
 void RTSPServer::RTSPClientSession::reclaimStreamStates() {
+    Logi("enter");
   for (unsigned i = 0; i < fNumStreamStates; ++i) {
     if (fStreamStates[i].subsession != NULL) {
       fOurRTSPServer.unnoteTCPStreamingOnSocket(fStreamStates[i].tcpSocketNum, this, i);
+            Logi("call deleteStream");
       fStreamStates[i].subsession->deleteStream(fOurSessionId, fStreamStates[i].streamToken);
     }
   }
@@ -1246,7 +1270,8 @@ static Boolean parsePlayNowHeader(char const* buf) {
 
 void RTSPServer::RTSPClientSession
 ::handleCmd_SETUP(RTSPServer::RTSPClientConnection* ourClientConnection,
-		  char const* urlPreSuffix, char const* urlSuffix, char const* fullRequestStr) {
+		  char const* urlPreSuffix, char const* urlSuffix, char const* fullRequestStr) 
+{
   // Normally, "urlPreSuffix" should be the session (stream) name, and "urlSuffix" should be the subsession (track) name.
   // However (being "liberal in what we accept"), we also handle 'aggregate' SETUP requests (i.e., without a track name),
   // in the special case where we have only a single track.  I.e., in this case, we also handle:
@@ -1340,6 +1365,7 @@ void RTSPServer::RTSPClientSession
       // We already handled a "SETUP" for this track (to the same client),
       // so stop any existing streaming of it, before we set it up again:
       subsession->pauseStream(fOurSessionId, token);
+                          Logi("deleteStream");
       fOurRTSPServer.unnoteTCPStreamingOnSocket(fStreamStates[trackNum].tcpSocketNum, this, trackNum);
       subsession->deleteStream(fOurSessionId, token);
     }
@@ -1433,6 +1459,7 @@ void RTSPServer::RTSPClientSession
     } else {
       timeoutParameterString[0] = '\0';
     }
+        
     if (fIsMulticast) {
       switch (streamingMode) {
           case RTP_UDP: {
@@ -1592,6 +1619,7 @@ void RTSPServer::RTSPClientSession
 	|| subsession == fStreamStates[i].subsession) {
       if (fStreamStates[i].subsession != NULL) {
 	fOurRTSPServer.unnoteTCPStreamingOnSocket(fStreamStates[i].tcpSocketNum, this, i);
+                Logi("Call deleteStream");
 	fStreamStates[i].subsession->deleteStream(fOurSessionId, fStreamStates[i].streamToken);
 	fStreamStates[i].subsession = NULL;
       }
@@ -1609,6 +1637,7 @@ void RTSPServer::RTSPClientSession
       break;
     }
   }
+    Logi("noSubsessionsRemain:%d", noSubsessionsRemain);
   if (noSubsessionsRemain) delete this;
 }
 
@@ -1623,17 +1652,19 @@ void RTSPServer::RTSPClientSession
   // Parse the client's "Scale:" header, if any:
   float scale = .0;
   Boolean sawScaleHeader = parseScaleHeader(fullRequestStr, scale);
-  Logi("fanhongxuan:request scale:%f\n", scale);
-  // Try to set the stream's scale factor to this value:
+    Logi("rtspURL:%s", rtspURL);
+    Logi("fullRequestStr:%s", fullRequestStr);
+    Logi("fanhongxuan:request scale:%f", scale);
+    // Try to set the stream's scale factor to this value:
   if (subsession == NULL /*aggregate op*/) {
-    Logi("call fOurServerMediaSession->testScaleFactor\n");
-    fOurServerMediaSession->testScaleFactor(scale);
+        Logi("call fOurServerMediaSession->testScaleFactor");
+        fOurServerMediaSession->testScaleFactor(scale);
   } else {
-    Logi("call subsession->testScaleFactor\n");
-    subsession->testScaleFactor(scale);
+        Logi("call subsession->testScaleFactor");
+        subsession->testScaleFactor(scale);
   }
-  Logi("reply scale:%f\n", scale);
-  char buf[100];
+    Logi("reply scale:%f", scale);
+    char buf[100];
   char* scaleHeader;
   if (!sawScaleHeader) {
     buf[0] = '\0'; // Because we didn't see a Scale: header, don't send one back
@@ -1831,7 +1862,7 @@ void RTSPServer::RTSPClientSession
 	   rangeHeader,
 	   fOurSessionId,
 	   rtpInfo);
-  Logi("scaleHeader:%s\n", scaleHeader);
+  Logi("scaleHeader:%s", scaleHeader);
   delete[] rtpInfo; delete[] rangeHeader;
   delete[] scaleHeader; delete[] rtspURL;
 }

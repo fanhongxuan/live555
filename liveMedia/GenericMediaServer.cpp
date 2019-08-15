@@ -20,6 +20,8 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 // Implementation
 
 #include "GenericMediaServer.hh"
+#include "Log.h"
+// #define DEBUG
 #include <GroupsockHelper.hh>
 #if defined(__WIN32__) || defined(_WIN32) || defined(_QNX4)
 #define snprintf _snprintf
@@ -305,8 +307,8 @@ void GenericMediaServer::ClientSession::livenessTimeoutTask(ClientSession* clien
 #ifdef DEBUG
   char const* streamName
     = (clientSession->fOurServerMediaSession == NULL) ? "???" : clientSession->fOurServerMediaSession->streamName();
-  fprintf(stderr, "Client session (id \"%08X\", stream name \"%s\") has timed out (due to inactivity)\n",
-	  clientSession->fOurSessionId, streamName);
+    Loge("Client session (id \"%08X\", stream name \"%s\") has timed out (due to inactivity)\n",
+         clientSession->fOurSessionId, streamName);
 #endif
   delete clientSession;
 }

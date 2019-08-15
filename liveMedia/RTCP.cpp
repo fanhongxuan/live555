@@ -21,6 +21,8 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "RTCP.hh"
 #include "GroupsockHelper.hh"
 #include "rtcp_from_spec.h"
+#include "Log.h"
+
 #if defined(__WIN32__) || defined(_WIN32) || defined(_QNX4)
 #define snprintf _snprintf
 #endif
@@ -89,7 +91,7 @@ void RTCPMemberDatabase::reapOldMembers(unsigned threshold) {
     char const* key;
     while ((timeCount = (uintptr_t)(iter->next(key))) != 0) {
 #ifdef DEBUG
-      fprintf(stderr, "reap: checking SSRC 0x%lx: %ld (threshold %d)\n", (unsigned long)key, timeCount, threshold);
+      Loge( "reap: checking SSRC 0x%lx: %ld (threshold %d)\n", (unsigned long)key, timeCount, threshold);
 #endif
       if (timeCount < (uintptr_t)threshold) { // this SSRC is old
         uintptr_t ssrc = (uintptr_t)key;
@@ -101,7 +103,7 @@ void RTCPMemberDatabase::reapOldMembers(unsigned threshold) {
 
     if (foundOldMember) {
 #ifdef DEBUG
-        fprintf(stderr, "reap: removing SSRC 0x%x\n", oldSSRC);
+        Loge( "reap: removing SSRC 0x%x\n", oldSSRC);
 #endif
 	fOurRTCPInstance.removeSSRC(oldSSRC, True);
     }
@@ -139,7 +141,7 @@ RTCPInstance::RTCPInstance(UsageEnvironment& env, Groupsock* RTCPgs,
     fSpecificRRHandlerTable(NULL),
     fAppHandlerTask(NULL), fAppHandlerClientData(NULL) {
 #ifdef DEBUG
-  fprintf(stderr, "RTCPInstance[%p]::RTCPInstance()\n", this);
+  Loge( "RTCPInstance[%p]::RTCPInstance()\n", this);
 #endif
   if (fTotSessionBW == 0) { // not allowed!
     env << "RTCPInstance::RTCPInstance error: totSessionBW parameter should not be zero!\n";
@@ -182,7 +184,7 @@ struct RRHandlerRecord {
 
 RTCPInstance::~RTCPInstance() {
 #ifdef DEBUG
-  fprintf(stderr, "RTCPInstance[%p]::~RTCPInstance()\n", this);
+  Loge( "RTCPInstance[%p]::~RTCPInstance()\n", this);
 #endif
   // Begin by sending a BYE.  We have to do this immediately, without
   // 'reconsideration', because "this" is going away.
@@ -505,19 +507,19 @@ void RTCPInstance
     unsigned char* pkt = fInBuf;
 
 #ifdef DEBUG
-    fprintf(stderr, "[%p]saw incoming RTCP packet (from ", this);
+    Loge( "[%p]saw incoming RTCP packet (from ", this);
     if (tcpSocketNum < 0) {
       // Note that "fromAddressAndPort" is valid only if we're receiving over UDP (not over TCP):
-      fprintf(stderr, "address %s, port %d", AddressString(fromAddressAndPort).val(), ntohs(fromAddressAndPort.sin_port));
+      Loge( "address %s, port %d", AddressString(fromAddressAndPort).val(), ntohs(fromAddressAndPort.sin_port));
     } else {
-      fprintf(stderr, "TCP socket #%d, stream channel id %d", tcpSocketNum, tcpStreamChannelId);
+      Loge( "TCP socket #%d, stream channel id %d", tcpSocketNum, tcpStreamChannelId);
     }
-    fprintf(stderr, ")\n");
+    Loge( ")\n");
     for (unsigned i = 0; i < packetSize; ++i) {
-      if (i%4 == 0) fprintf(stderr, " ");
-      fprintf(stderr, "%02x", pkt[i]);
+      if (i%4 == 0) Loge( " ");
+      Loge( "%02x", pkt[i]);
     }
-    fprintf(stderr, "\n");
+    Loge( "\n");
 #endif
     int totPacketSize = IP_UDP_HDR_SIZE + packetSize;
 
@@ -530,7 +532,7 @@ void RTCPInstance
     if ((rtcpHdr & 0xE0FE0000) != (0x80000000 | (RTCP_PT_SR<<16)) &&
 	(rtcpHdr & 0xE0FF0000) != (0x80000000 | (RTCP_PT_APP<<16))) {
 #ifdef DEBUG
-      fprintf(stderr, "rejected bad RTCP packet: header 0x%08x\n", rtcpHdr);
+      Loge( "rejected bad RTCP packet: header 0x%08x\n", rtcpHdr);
 #endif
       break;
     }
@@ -564,7 +566,7 @@ void RTCPInstance
       switch (pt) {
         case RTCP_PT_SR: {
 #ifdef DEBUG
-	  fprintf(stderr, "SR\n");
+	  Loge( "SR\n");
 #endif
 	  if (length < 20) break; length -= 20;
 
@@ -587,7 +589,7 @@ void RTCPInstance
 	}
         case RTCP_PT_RR: {
 #ifdef DEBUG
-	  fprintf(stderr, "RR\n");
+	  Loge( "RR\n");
 #endif
 	  unsigned reportBlocksSize = rc*(6*4);
 	  if (length < reportBlocksSize) break;
@@ -627,7 +629,7 @@ void RTCPInstance
 	}
         case RTCP_PT_BYE: {
 #ifdef DEBUG
-	  fprintf(stderr, "BYE");
+	  Loge( "BYE");
 #endif
 	  // Check whether there was a 'reason for leaving':
 	  if (length > 0) {
@@ -635,7 +637,7 @@ void RTCPInstance
 	    if (reasonLength > length-1) {
 	      // The 'reason' length field is too large!
 #ifdef DEBUG
-	      fprintf(stderr, "\nError: The 'reason' length %d is too large (it should be <= %d)\n",
+	      Loge( "\nError: The 'reason' length %d is too large (it should be <= %d)\n",
 		      reasonLength, length-1);
 #endif
 	      reasonLength = length-1;
@@ -646,11 +648,11 @@ void RTCPInstance
 	    }
 	    reason[reasonLength] = '\0';
 #ifdef DEBUG
-	    fprintf(stderr, " (reason:%s)", reason);
+	    Loge( " (reason:%s)", reason);
 #endif
 	  }
 #ifdef DEBUG
-	  fprintf(stderr, "\n");
+	  Loge( "\n");
 #endif
 	  // If a 'BYE handler' was set, arrange for it to be called at the end of this routine.
 	  // (Note: We don't call it immediately, in case it happens to cause "this" to be deleted.)
@@ -672,22 +674,22 @@ void RTCPInstance
         case RTCP_PT_APP: {
 	  u_int8_t& subtype = rc; // In "APP" packets, the "rc" field gets used as "subtype"
 #ifdef DEBUG
-	  fprintf(stderr, "APP (subtype 0x%02x)\n", subtype);
+	  Loge( "APP (subtype 0x%02x)\n", subtype);
 #endif
 	  if (length < 4) {
 #ifdef DEBUG
-	    fprintf(stderr, "\tError: No \"name\" field!\n");
+	    Loge( "\tError: No \"name\" field!\n");
 #endif
 	    break;
 	  }
 	  length -= 4;
 #ifdef DEBUG
-	  fprintf(stderr, "\tname:%c%c%c%c\n", pkt[0], pkt[1], pkt[2], pkt[3]);
+	  Loge( "\tname:%c%c%c%c\n", pkt[0], pkt[1], pkt[2], pkt[3]);
 #endif
 	  u_int32_t nameBytes = (pkt[0]<<24)|(pkt[1]<<16)|(pkt[2]<<8)|(pkt[3]);
 	  ADVANCE(4); // skip over "name", to the 'application-dependent data'
 #ifdef DEBUG
-	  fprintf(stderr, "\tapplication-dependent data size: %d bytes\n", length);
+	  Loge( "\tapplication-dependent data size: %d bytes\n", length);
 #endif
 
 	  // If an 'APP' packet handler was set, call it now:
@@ -702,7 +704,7 @@ void RTCPInstance
         case RTCP_PT_SDES: {
 #ifdef DEBUG
 	  // 'Handle' SDES packets only in debugging code, by printing out the 'SDES items':
-	  fprintf(stderr, "SDES\n");
+	  Loge( "SDES\n");
 
 	  // Process each 'chunk':
 	  Boolean chunkOK = False;
@@ -711,7 +713,7 @@ void RTCPInstance
 	    chunkOK = False; // until we learn otherwise
 
 	    u_int32_t SSRC_CSRC = ntohl(*(u_int32_t*)pkt); ADVANCE(4); length -= 4;
-	    fprintf(stderr, "\tSSRC/CSRC: 0x%08x\n", SSRC_CSRC);
+	    Loge( "\tSSRC/CSRC: 0x%08x\n", SSRC_CSRC);
 
 	    // Process each 'SDES item' in the chunk:
 	    u_int8_t itemType = *pkt; ADVANCE(1); --length;
@@ -720,7 +722,7 @@ void RTCPInstance
 	      // Make sure "itemLen" allows for at least 1 zero byte at the end of the chunk:
 	      if (itemLen + 1 > length || pkt[itemLen] != 0) break;
 
-	      fprintf(stderr, "\t\t%s:%s\n",
+	      Loge( "\t\t%s:%s\n",
 		      itemType == 1 ? "CNAME" :
 		      itemType == 2 ? "NAME" :
 		      itemType == 3 ? "EMAIL" :
@@ -752,14 +754,14 @@ void RTCPInstance
 	}
         case RTCP_PT_RTPFB: {
 #ifdef DEBUG
-	  fprintf(stderr, "RTPFB(unhandled)\n");
+	  Loge( "RTPFB(unhandled)\n");
 #endif
 	  subPacketOK = True;
 	  break;
 	}
         case RTCP_PT_PSFB: {
 #ifdef DEBUG
-	  fprintf(stderr, "PSFB(unhandled)\n");
+	  Loge( "PSFB(unhandled)\n");
 	  // Temporary code to show "Receiver Estimated Maximum Bitrate" (REMB) feedback reports:
 	  //#####
 	  if (length >= 12 && pkt[4] == 'R' && pkt[5] == 'E' && pkt[6] == 'M' && pkt[7] == 'B') {
@@ -770,7 +772,7 @@ void RTCPInstance
 	      remb *= 2.0;
 	      exp /= 2;
 	    }
-	    fprintf(stderr, "\tReceiver Estimated Max Bitrate (REMB): %g bps\n", remb);
+	    Loge( "\tReceiver Estimated Max Bitrate (REMB): %g bps\n", remb);
 	  }
 #endif
 	  subPacketOK = True;
@@ -778,42 +780,42 @@ void RTCPInstance
 	}
         case RTCP_PT_XR: {
 #ifdef DEBUG
-	  fprintf(stderr, "XR(unhandled)\n");
+	  Loge( "XR(unhandled)\n");
 #endif
 	  subPacketOK = True;
 	  break;
 	}
         case RTCP_PT_AVB: {
 #ifdef DEBUG
-	  fprintf(stderr, "AVB(unhandled)\n");
+	  Loge( "AVB(unhandled)\n");
 #endif
 	  subPacketOK = True;
 	  break;
 	}
         case RTCP_PT_RSI: {
 #ifdef DEBUG
-	  fprintf(stderr, "RSI(unhandled)\n");
+	  Loge( "RSI(unhandled)\n");
 #endif
 	  subPacketOK = True;
 	  break;
 	}
         case RTCP_PT_TOKEN: {
 #ifdef DEBUG
-	  fprintf(stderr, "TOKEN(unhandled)\n");
+	  Loge( "TOKEN(unhandled)\n");
 #endif
 	  subPacketOK = True;
 	  break;
 	}
         case RTCP_PT_IDMS: {
 #ifdef DEBUG
-	  fprintf(stderr, "IDMS(unhandled)\n");
+	  Loge( "IDMS(unhandled)\n");
 #endif
 	  subPacketOK = True;
 	  break;
 	}
         default: {
 #ifdef DEBUG
-	  fprintf(stderr, "UNKNOWN TYPE(0x%x)\n", pt);
+	  Loge( "UNKNOWN TYPE(0x%x)\n", pt);
 #endif
 	  subPacketOK = True;
 	  break;
@@ -824,7 +826,7 @@ void RTCPInstance
       // need to check for (& handle) SSRC collision! #####
 
 #ifdef DEBUG
-      fprintf(stderr, "validated RTCP subpacket: rc:%d, pt:%d, bytes remaining:%d, report sender SSRC:0x%08x\n", rc, pt, length, reportSenderSSRC);
+      Loge( "validated RTCP subpacket: rc:%d, pt:%d, bytes remaining:%d, report sender SSRC:0x%08x\n", rc, pt, length, reportSenderSSRC);
 #endif
 
       // Skip over any remaining bytes in this subpacket:
@@ -836,14 +838,14 @@ void RTCPInstance
 	break;
       } else if (packetSize < 4) {
 #ifdef DEBUG
-	fprintf(stderr, "extraneous %d bytes at end of RTCP packet!\n", packetSize);
+	Loge( "extraneous %d bytes at end of RTCP packet!\n", packetSize);
 #endif
 	break;
       }
       rtcpHdr = ntohl(*(u_int32_t*)pkt);
       if ((rtcpHdr & 0xC0000000) != 0x80000000) {
 #ifdef DEBUG
-	fprintf(stderr, "bad RTCP subpacket: header 0x%08x\n", rtcpHdr);
+	Loge( "bad RTCP subpacket: header 0x%08x\n", rtcpHdr);
 #endif
 	break;
       }
@@ -851,12 +853,12 @@ void RTCPInstance
 
     if (!packetOK) {
 #ifdef DEBUG
-      fprintf(stderr, "rejected bad RTCP subpacket: header 0x%08x\n", rtcpHdr);
+      Loge( "rejected bad RTCP subpacket: header 0x%08x\n", rtcpHdr);
 #endif
       break;
     } else {
 #ifdef DEBUG
-      fprintf(stderr, "validated entire RTCP packet\n");
+      Loge( "validated entire RTCP packet\n");
 #endif
     }
 
@@ -899,7 +901,7 @@ void RTCPInstance::onReceive(int typeOfPacket, int totPacketSize, u_int32_t ssrc
 
 void RTCPInstance::sendReport() {
 #ifdef DEBUG
-  fprintf(stderr, "sending REPORT\n");
+  Loge( "sending REPORT\n");
 #endif
   // Begin by including a SR and/or RR report:
   if (!addReport()) return;
@@ -921,9 +923,9 @@ void RTCPInstance::sendReport() {
 void RTCPInstance::sendBYE(char const* reason) {
 #ifdef DEBUG
   if (reason != NULL) {
-    fprintf(stderr, "sending BYE (reason:%s)\n", reason);
+    Loge( "sending BYE (reason:%s)\n", reason);
   } else {
-    fprintf(stderr, "sending BYE\n");
+    Loge( "sending BYE\n");
   }
 #endif
   // The packet must begin with a SR and/or RR report:
@@ -935,13 +937,13 @@ void RTCPInstance::sendBYE(char const* reason) {
 
 void RTCPInstance::sendBuiltPacket() {
 #ifdef DEBUG
-  fprintf(stderr, "sending RTCP packet\n");
+  Loge( "sending RTCP packet\n");
   unsigned char* p = fOutBuf->packet();
-  for (unsigned i = 0; i < fOutBuf->curPacketSize(); ++i) {
-    if (i%4 == 0) fprintf(stderr," ");
-    fprintf(stderr, "%02x", p[i]);
-  }
-  fprintf(stderr, "\n");
+    // for (unsigned i = 0; i < fOutBuf->curPacketSize(); ++i) {
+    //   if (i%4 == 0) Loge(" ");
+    //   Loge( "%02x", p[i]);
+    // }
+  // Loge( "\n");
 #endif
   unsigned reportSize = fOutBuf->curPacketSize();
   fRTCPInterface.sendPacket(fOutBuf->packet(), reportSize);
@@ -1223,7 +1225,7 @@ void RTCPInstance::schedule(double nextTime) {
   double secondsToDelay = nextTime - dTimeNow();
   if (secondsToDelay < 0) secondsToDelay = 0;
 #ifdef DEBUG
-  fprintf(stderr, "schedule(%f->%f)\n", secondsToDelay, nextTime);
+  Loge( "schedule(%f->%f)\n", secondsToDelay, nextTime);
 #endif
   int64_t usToGo = (int64_t)(secondsToDelay * 1000000);
   nextTask() = envir().taskScheduler().scheduleDelayedTask(usToGo,

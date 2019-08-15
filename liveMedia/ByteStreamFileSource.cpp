@@ -195,9 +195,6 @@ static int EndCallBack(long lRealHandle, unsigned long dwUser)
 {
     Logi("handle:%d,dwUser:%p", (int)lRealHandle, (void*)dwUser);
     ByteStreamFileSource *pSource = (ByteStreamFileSource*)(dwUser);
-#ifdef USE_LOCALSDK    
-    LOCALSDK_StopGetFile(lRealHandle);
-#endif    
     pSource->setFileHandle(0);
     return 0;
 }
@@ -427,6 +424,11 @@ ByteStreamFileSource::~ByteStreamFileSource() {
         free(mpFileName);
         mpFileName = NULL;
     }
+    pthread_cond_destroy(&mFrameBufferReadCond);
+    pthread_mutex_destroy(&mFrameBufferReadMutex);
+    pthread_cond_destroy(&mFrameBufferProcessCond);
+    pthread_mutex_destroy(&mFrameBufferProcessMutex);
+    
     if (fFid == NULL) return;
 #ifndef READ_FROM_FILES_SYNCHRONOUSLY
   envir().taskScheduler().turnOffBackgroundReadHandling(fileno(fFid));
@@ -437,7 +439,7 @@ ByteStreamFileSource::~ByteStreamFileSource() {
 void ByteStreamFileSource::doGetNextFrame() {
     // Logi("Enter:%d", mlFileHandle);
     if (0 == mlFileHandle){
-        if (feof(fFid) || ferror(fFid) || (fLimitNumBytesToStream && fNumBytesToStream == 0)) {
+        if (NULL == fFid || feof(fFid) || ferror(fFid) || (fLimitNumBytesToStream && fNumBytesToStream == 0)) {
             handleClosure();
             return;
         }
@@ -576,6 +578,11 @@ void ByteStreamFileSource::doReadFromFile() {
             else{
                 Logi("Has left some data for the next time process.");
             }
+            break;
+        }
+        else if (mlFileHandle == 0){
+            Logi("End of the file");
+            fFrameSize = 0;
             break;
         }
         else{

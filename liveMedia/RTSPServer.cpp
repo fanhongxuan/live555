@@ -348,6 +348,7 @@ void RTSPServer::RTSPClientConnection
         ServerMediaSubsession* subsession = NULL;
         struct sockaddr_in sourceAddr; SOCKLEN_T namelen = sizeof(sourceAddr);
         getsockname(fClientInputSocket, (struct sockaddr*)&sourceAddr, &namelen);
+        AddressString sourceAddrStr(sourceAddr);
         while ((subsession = iter.next()) != NULL){
             Logi("setServerAddressAndPortForSDP:[%p](%s)0x%04X", subsession, sourceAddrStr.val(), sourceAddr.sin_addr.s_addr);
             subsession->setServerAddressAndPortForSDP(sourceAddr.sin_addr.s_addr, 0);

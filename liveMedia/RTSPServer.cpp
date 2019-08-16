@@ -1870,7 +1870,9 @@ void RTSPServer::RTSPClientSession
 
 void RTSPServer::RTSPClientSession
 ::handleCmd_PAUSE(RTSPServer::RTSPClientConnection* ourClientConnection,
-		  ServerMediaSubsession* subsession) {
+		  ServerMediaSubsession* subsession) 
+{
+    Logi("Enter");
   for (unsigned i = 0; i < fNumStreamStates; ++i) {
     if (subsession == NULL /* means: aggregated operation */
 	|| subsession == fStreamStates[i].subsession) {

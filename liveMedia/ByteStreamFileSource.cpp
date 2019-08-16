@@ -459,18 +459,18 @@ void ByteStreamFileSource::doGetNextFrame() {
 
 void ByteStreamFileSource::doStopGettingFrames() {
     Logi("Enter");
-    if (0 != mlFileHandle){
-        long handle = mlFileHandle;
-        // set the mlFileHandle to 0 to make sure the callback will not waiting on the signal anymore.
-        mlFileHandle = 0; 
-        Logi("Notify the callback return if they are waiting");
-        pthread_cond_signal(&mFrameBufferReadCond);
-        int ret = 0;
-#ifdef USE_LOCALSDK
-        ret = LOCALSDK_StopGetFile(handle);
-#endif
-        Logi("LOCALSDK_StopGetFile ret:%d", ret);
-    }
+    //     if (0 != mlFileHandle){
+    //         long handle = mlFileHandle;
+    //         // set the mlFileHandle to 0 to make sure the callback will not waiting on the signal anymore.
+    //         mlFileHandle = 0; 
+    //         Logi("Notify the callback return if they are waiting");
+    //         pthread_cond_signal(&mFrameBufferReadCond);
+    //         int ret = 0;
+    // #ifdef USE_LOCALSDK
+    //         ret = LOCALSDK_StopGetFile(handle);
+    // #endif
+    //         Logi("LOCALSDK_StopGetFile ret:%d", ret);
+    //     }
   envir().taskScheduler().unscheduleDelayedTask(nextTask());
 #ifndef READ_FROM_FILES_SYNCHRONOUSLY
   envir().taskScheduler().turnOffBackgroundReadHandling(fileno(fFid));

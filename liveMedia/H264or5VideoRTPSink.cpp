@@ -20,6 +20,12 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 
 #include "H264or5VideoRTPSink.hh"
 #include "H264or5VideoStreamFramer.hh"
+#define PACK_NALU_IN_ONE_PS_PACKAGE
+#ifdef PACK_NALU_IN_ONE_PS_PACKAGE
+// add by fanhongxuan@gmail.com
+#include "litets.h"
+#define BUF_SIZE (1<<20)
+#endif
 
 ////////// H264or5Fragmenter definition //////////
 
@@ -37,6 +43,15 @@ public:
   virtual ~H264or5Fragmenter();
 
   Boolean lastFragmentCompletedNALUnit() const { return fLastFragmentCompletedNALUnit; }
+
+private:
+#ifdef PACK_NALU_IN_ONE_PS_PACKAGE
+    TsProgramInfo g_prog_info;
+    int g_frame_count;
+    uint8_t *g_outbuf;
+    int convert_nalu_to_ps(uint8_t *pData, size_t data_len, char is_key);
+    int init_ps();
+#endif
 
 private: // redefined virtual functions:
   virtual void doGetNextFrame();
@@ -75,7 +90,8 @@ H264or5VideoRTPSink
 		      u_int8_t const* pps, unsigned ppsSize)
   : VideoRTPSink(env, RTPgs, rtpPayloadFormat, 90000, hNumber == 264 ? "H264" : "H265"),
     fHNumber(hNumber), fOurFragmenter(NULL), fFmtpSDPLine(NULL) {
-  if (vps != NULL) {
+
+    if (vps != NULL) {
     fVPSSize = vpsSize;
     fVPS = new u_int8_t[fVPSSize];
     memmove(fVPS, vps, fVPSSize);
@@ -169,27 +185,35 @@ H264or5Fragmenter::H264or5Fragmenter(int hNumber,
     fInputBufferSize(inputBufferMax+1), fMaxOutputPacketSize(maxOutputPacketSize) {
   fInputBuffer = new unsigned char[fInputBufferSize];
   reset();
+#ifdef  PACK_NALU_IN_ONE_PS_PACKAGE
+    g_outbuf = NULL;
+    g_frame_count = 0;
+#endif
 }
 
 H264or5Fragmenter::~H264or5Fragmenter() {
-  delete[] fInputBuffer;
+#ifdef PACK_NALU_IN_ONE_PS_PACKAGE
+    if (NULL != g_outbuf){
+        delete []g_outbuf;
+    }
+#endif
+    delete[] fInputBuffer;
   detachInputSource(); // so that the subsequent ~FramedFilter() doesn't delete it
 }
 
-#define PACK_NALU_IN_ONE_PS_PACKAGE
+// #define PACK_NALU_IN_ONE_PS_PACKAGE
 #ifdef PACK_NALU_IN_ONE_PS_PACKAGE
 // add by fanhongxuan@gmail.com
-#include "litets.h"
-#define BUF_SIZE (1<<20)
-
-static TsProgramInfo g_prog_info;                                                                                         
-static int g_frame_count = 0;
-// static uint8_t *g_inbuf = new uint8_t[BUF_SIZE];
-static uint8_t *g_outbuf = new uint8_t[BUF_SIZE]; 
+// #include "litets.h"
+// #define BUF_SIZE (1<<20)
 
 
 // convert the nalu to ps.
-static int init_ps(){
+int H264or5Fragmenter::init_ps()
+{
+    if (NULL == g_outbuf){
+        g_outbuf = new uint8_t[BUF_SIZE];
+    }
     memset(&g_prog_info, 0, sizeof(g_prog_info));                                                                         
     g_prog_info.program_num = 1;                                                                                          
     g_prog_info.prog[0].stream_num = 1;                                                                                   
@@ -197,7 +221,7 @@ static int init_ps(){
     return 0;
 }
 
-static int convert_nalu_to_ps(uint8_t *pData, size_t data_len, char is_key)
+int H264or5Fragmenter::convert_nalu_to_ps(uint8_t *pData, size_t data_len, char is_key)
 {
    init_ps();
    TEsFrame es={0};

@@ -262,29 +262,32 @@ char* ServerMediaSession::generateSDPDescription() {
     }
 
     char const* const sdpPrefixFmt =
-      "v=0\r\n"
-      "o=- %ld%06ld %d IN IP4 %s\r\n"
-      "s=%s\r\n"
-      "i=%s\r\n"
-      /*modified by fanhongxuan@gmail.com*/
-      "t=0 0\r\n"
-      "a=tool:%s%s\r\n"
-      "a=type:broadcast\r\n"
-      "a=control:*\r\n"
-      "%s"
-      "%s"
-      "a=x-qt-text-nam:%s\r\n"
-      "a=x-qt-text-inf:%s\r\n"
-      "%s";
+        "v=0\r\n"
+        "o=- %ld%06ld %d IN IP4 %s\r\n"
+        "s=%s\r\n"
+        /* "i=%s\r\n"*/ /* removed by fanhongxuan@gmail.com*/
+        /*modified by fanhongxuan@gmail.com*/
+        "t=0 0\r\n"
+        "a=tool:%s%s\r\n"
+        "a=type:broadcast\r\n"
+        /*"a=control:*\r\n"*/
+        "%s"
+        "%s"
+        /* removed by fanhongxuan@gmail.com */
+        /*
+         "a=x-qt-text-nam:%s\r\n"
+         "a=x-qt-text-inf:%s\r\n"
+         */
+        "%s";
     sdpLength += strlen(sdpPrefixFmt)
       + 20 + 6 + 20 + ipAddressStrSize
       + strlen(fDescriptionSDPString)
-      + strlen(fInfoSDPString)
+      // + strlen(fInfoSDPString)
       + strlen(libNameStr) + strlen(libVersionStr)
       + strlen(sourceFilterLine)
       + strlen(rangeLine)
-      + strlen(fDescriptionSDPString)
-      + strlen(fInfoSDPString)
+      // + strlen(fDescriptionSDPString)
+      // + strlen(fInfoSDPString)
       + strlen(fMiscSDPLines);
     sdpLength += 1000; // in case the length of the "subsession->sdpLines()" calls below change
     sdp = new char[sdpLength];
@@ -296,12 +299,12 @@ char* ServerMediaSession::generateSDPDescription() {
 	     1, // o= <version> // (needs to change if params are modified)
 	     ipAddressStr.val(), // o= <address>
 	     fDescriptionSDPString, // s= <description>
-	     fInfoSDPString, // i= <info>
+	     // fInfoSDPString, // i= <info>
 	     libNameStr, libVersionStr, // a=tool:
 	     sourceFilterLine, // a=source-filter: incl (if a SSM session)
 	     rangeLine, // a=range: line
-	     fDescriptionSDPString, // a=x-qt-text-nam: line
-	     fInfoSDPString, // a=x-qt-text-inf: line
+	     // fDescriptionSDPString, // a=x-qt-text-nam: line
+	     // fInfoSDPString, // a=x-qt-text-inf: line
 	     fMiscSDPLines); // miscellaneous session SDP lines (if any)
 
     // Then, add the (media-level) lines for each subsession:

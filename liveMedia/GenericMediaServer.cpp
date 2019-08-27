@@ -292,9 +292,10 @@ void GenericMediaServer::ClientSession::noteLiveness() {
   if (fOurServerMediaSession != NULL) fOurServerMediaSession->noteLiveness();
 
   if (fOurServer.fReclamationSeconds > 0) {
-    envir().taskScheduler().rescheduleDelayedTask(fLivenessCheckTask,
-						  fOurServer.fReclamationSeconds*1000000,
-						  (TaskFunc*)livenessTimeoutTask, this);
+        Loge("Don't start the livenessTimeoutTask");
+        // envir().taskScheduler().rescheduleDelayedTask(fLivenessCheckTask,
+        // 		  fOurServer.fReclamationSeconds*1000000,
+        // 		  (TaskFunc*)livenessTimeoutTask, this);
   }
 }
 

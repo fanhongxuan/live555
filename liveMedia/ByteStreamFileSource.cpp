@@ -186,6 +186,19 @@ static  int PlayBackCallBackV2(long lRealHandle,
     pBuffer->nWidth = pFrameInfo->nWidth;
     pBuffer->nHeight = pFrameInfo->nHeight;
     pBuffer->nOffset = 0;
+    if (0){
+        // temp, save the data to a file
+        char name[256] = {0};
+        sprintf(name, "/tmp/%d.264", (int)dwUser);
+        FILE *fp = fopen(name, "a");
+        if (NULL != fp){
+            fwrite(pFrameInfo->pContent, 1, pFrameInfo->nFrameLength, fp);
+            fclose(fp);
+        }
+        else{
+            Loge("Failed to open %s", name);
+        }
+    }
     pSource->addFrameBuffer(pBuffer);
     Logi("Leave");
     return 0;

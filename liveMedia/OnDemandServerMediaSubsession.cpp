@@ -76,7 +76,7 @@ OnDemandServerMediaSubsession::sdpLines() {
     /*note:fanhongxuan@gmail.com
      *change the rtpPayloadType from 96 to 100
      */
-    unsigned char rtpPayloadType = 101 + trackNumber()-1; // if dynamic
+    unsigned char rtpPayloadType = 100 + trackNumber()-1; // if dynamic
     RTPSink* dummyRTPSink = createNewRTPSink(dummyGroupsock, rtpPayloadType, inputSource);
     if (dummyRTPSink != NULL && dummyRTPSink->estimatedBitrate() > 0) estBitrate = dummyRTPSink->estimatedBitrate();
 
@@ -178,7 +178,7 @@ void OnDemandServerMediaSubsession
      * note:fanhongxuan@gmail.com
      * change the rtpPayloadType from 96 to 100.
      */
-	unsigned char rtpPayloadType = 101 + trackNumber()-1; // if dynamic
+	unsigned char rtpPayloadType = 100 + trackNumber()-1; // if dynamic
 	rtpSink = createNewRTPSink(rtpGroupsock, rtpPayloadType, mediaSource);
 	if (rtpSink != NULL && rtpSink->estimatedBitrate() > 0) streamBitrate = rtpSink->estimatedBitrate();
       }

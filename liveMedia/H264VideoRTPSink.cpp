@@ -122,7 +122,7 @@ char const* H264VideoRTPSink::auxSDPLine() {
     + strlen(sps_base64) + strlen(pps_base64);
   char* fmtp = new char[fmtpFmtSize];
   sprintf(fmtp, fmtpFmt,
-          /* changed by fanhongxuan@gmail.com */ 101
+          /* changed by fanhongxuan@gmail.com */ 100
           /*rtpPayloadType()*/ ,
 	  profileLevelId/*,
           sps_base64, pps_base64*/);

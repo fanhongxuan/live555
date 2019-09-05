@@ -89,11 +89,13 @@ int main(int argc, char** argv) {
 
   // Create the RTSP server.  Try first with the default port number (554),
   // and then with the alternative port number (8554):
+  // changed by fanhongxuan@gmail.com
+  // first try 8554, then 18854
   RTSPServer* rtspServer;
-  portNumBits rtspServerPortNum = 554;
+  portNumBits rtspServerPortNum = 8554;
   rtspServer = DynamicRTSPServer::createNew(*env, rtspServerPortNum, authDB);
   if (rtspServer == NULL) {
-    rtspServerPortNum = 8554;
+    rtspServerPortNum = 18554;
     rtspServer = DynamicRTSPServer::createNew(*env, rtspServerPortNum, authDB);
   }
   if (rtspServer == NULL) {
@@ -132,7 +134,10 @@ int main(int argc, char** argv) {
   // Try first with the default HTTP port (80), and then with the alternative HTTP
   // port numbers (8000 and 8080).
 
-  if (rtspServer->setUpTunnelingOverHTTP(80) || rtspServer->setUpTunnelingOverHTTP(8000) || rtspServer->setUpTunnelingOverHTTP(8080)) {
+  // note:fanhongxuan@gmail.com
+  // first try 10080, then 18000, then 18080
+
+  if (rtspServer->setUpTunnelingOverHTTP(10080) || rtspServer->setUpTunnelingOverHTTP(18000) || rtspServer->setUpTunnelingOverHTTP(18080)) {
     *env << "(We use port " << rtspServer->httpServerPortNum() << " for optional RTSP-over-HTTP tunneling, or for HTTP live streaming (for indexed Transport Stream files only).)\n";
   } else {
     *env << "(RTSP-over-HTTP tunneling is not available.)\n";

@@ -599,7 +599,8 @@ void ByteStreamFileSource::doReadFromFile() {
             break;
         }
         else{
-            Logi("No frame valid, wait for the signal");
+            Logi("No frame valid, wait for the signal, send the peek signal");
+            pthread_cond_signal(&mFrameBufferReadCond);
             pthread_mutex_lock(&mFrameBufferProcessMutex);
             pthread_cond_wait(&mFrameBufferProcessCond, &mFrameBufferProcessMutex);
             pthread_mutex_unlock(&mFrameBufferProcessMutex);

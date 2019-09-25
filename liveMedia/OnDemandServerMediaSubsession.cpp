@@ -473,7 +473,7 @@ void OnDemandServerMediaSubsession
 
   char const* const sdpFmt =
     "m=%s %u RTP/AVP %d\r\n"
-    /*"c=IN IP4 %s\r\n"*/
+    "c=IN IP4 %s\r\n"
     "b=AS:%u\r\n"
     "%s"
     "%s"
@@ -482,7 +482,7 @@ void OnDemandServerMediaSubsession
     "a=control:%s\r\n";
   unsigned sdpFmtSize = strlen(sdpFmt)
     + strlen(mediaType) + 5 /* max short len */ + 3 /* max char len */
-    // + strlen(ipAddressStr.val())
+    + strlen(ipAddressStr.val())
     + 20 /* max int len */
     + strlen(rtpmapLine)
     + strlen(rtcpmuxLine)
@@ -494,7 +494,7 @@ void OnDemandServerMediaSubsession
 	  mediaType, // m= <media>
 	  fPortNumForSDP, // m= <port>
 	  rtpPayloadType, // m= <fmt list>
-	  // ipAddressStr.val(), // c= address
+	  ipAddressStr.val(), // c= address
 	  estBitrate, // b=AS:<bandwidth>
 	  rtpmapLine, // a=rtpmap:... (if present)
 	  rtcpmuxLine, // a=rtcp-mux:... (if present)

@@ -49,6 +49,9 @@ public:
 
 static pthread_mutex_t gLogMutex = PTHREAD_MUTEX_INITIALIZER;
 
+#ifdef __cplusplus
+extern "C"{
+#endif
 void logBegin(const char *type, const char *file, const char *function, int line)
 {
     pthread_mutex_lock(&gLogMutex);
@@ -77,7 +80,10 @@ void logEnd()
     printf("\n");
     pthread_mutex_unlock(&gLogMutex);
 }
-
+#ifdef __cplusplus
+}    
+#endif
+    
 static int buildFileInfoByName(LOCALSDK_FILE_DATA *pFileInfo, const char *pFileName){
     // todo:fanhongxan@gmail.com
     // parse the filename, channel, startTime/stopTime, size info from the pFileName

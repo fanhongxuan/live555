@@ -70,6 +70,7 @@ private:
   unsigned fSaveNumTruncatedBytes;
   Boolean fLastFragmentCompletedNALUnit;
     uint8_t *mpOutput;
+    ps_handle_t thePsHandle;
 };
 
 
@@ -83,31 +84,31 @@ H264or5VideoRTPSink
 		      u_int8_t const* pps, unsigned ppsSize)
   : VideoRTPSink(env, RTPgs, rtpPayloadFormat, 90000, hNumber == 264 ? "H264" : "H265"),
     fHNumber(hNumber), fOurFragmenter(NULL), fFmtpSDPLine(NULL) {
-
+    
     if (vps != NULL) {
-    fVPSSize = vpsSize;
-    fVPS = new u_int8_t[fVPSSize];
-    memmove(fVPS, vps, fVPSSize);
-  } else {
-    fVPSSize = 0;
-    fVPS = NULL;
-  }
-  if (sps != NULL) {
-    fSPSSize = spsSize;
-    fSPS = new u_int8_t[fSPSSize];
-    memmove(fSPS, sps, fSPSSize);
-  } else {
-    fSPSSize = 0;
-    fSPS = NULL;
-  }
-  if (pps != NULL) {
-    fPPSSize = ppsSize;
-    fPPS = new u_int8_t[fPPSSize];
-    memmove(fPPS, pps, fPPSSize);
-  } else {
-    fPPSSize = 0;
-    fPPS = NULL;
-  }
+        fVPSSize = vpsSize;
+        fVPS = new u_int8_t[fVPSSize];
+        memmove(fVPS, vps, fVPSSize);
+        } else {
+        fVPSSize = 0;
+        fVPS = NULL;
+    }
+    if (sps != NULL) {
+        fSPSSize = spsSize;
+        fSPS = new u_int8_t[fSPSSize];
+        memmove(fSPS, sps, fSPSSize);
+        } else {
+        fSPSSize = 0;
+        fSPS = NULL;
+    }
+    if (pps != NULL) {
+        fPPSSize = ppsSize;
+        fPPS = new u_int8_t[fPPSSize];
+        memmove(fPPS, pps, fPPSSize);
+        } else {
+        fPPSSize = 0;
+        fPPS = NULL;
+    }
 }
 
 H264or5VideoRTPSink::~H264or5VideoRTPSink() {
@@ -176,8 +177,9 @@ H264or5Fragmenter::H264or5Fragmenter(int hNumber,
   : FramedFilter(env, inputSource),
     fHNumber(hNumber),
     fInputBufferSize(inputBufferMax+1), fMaxOutputPacketSize(maxOutputPacketSize) {
-  fInputBuffer = new unsigned char[fInputBufferSize];
-  reset();
+    memset(&thePsHandle, 0, sizeof(thePsHandle));
+    fInputBuffer = new unsigned char[fInputBufferSize];
+    reset();
 }
 
 H264or5Fragmenter::~H264or5Fragmenter() {
@@ -197,7 +199,7 @@ int H264or5Fragmenter::convert_nalu_to_ps(uint8_t *pInput, uint32_t iInputSize, 
     gettimeofday(&tv,NULL);
     uint64_t pts = (90000*tv.tv_sec);
     pts += (u_int32_t)(90000*(tv.tv_usec/1000000.0) + 0.5); // note: rounding
-    create_ps_package(pInput, iInputSize, pOutput, pOutputSize, &pts);
+    create_ps_package(&thePsHandle, pInput, iInputSize, pOutput, pOutputSize, &pts);
     // Loge("Leave");
     return 0;
 }

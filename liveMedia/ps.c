@@ -2,15 +2,7 @@
 #include "ps.h"
 #include "Log.h"
 
-#define PS_BUFF_SIZE (1<<20)
-#define PES_BUFF_SIZE (65535)
-#define PES_LENGTH (65000)
-#define S_FRAME_MAX_COUNT (10)
-#define S_FRAME_SIZE 300
-typedef struct{
-    unsigned char ucBuff[S_FRAME_SIZE+1];
-    unsigned int uiLen;
-}s_frame_buff_t;
+
 static int g_frame_count = 0;
 
 static int create_ps_header(unsigned char *pOutput, int iOutputLen, uint64_t pts)
@@ -268,18 +260,22 @@ static int pack_h264_nalu(unsigned char *pOutput, int iOutputLen, unsigned char 
     return iRet;
 }
 
-int create_ps_package(uint8_t *pFrame, uint32_t iFrameLen, uint8_t **ppOutput, uint32_t *pOutputSize, uint64_t *pPts)
+int create_ps_package(ps_handle_t *pHandle, uint8_t *pFrame, uint32_t iFrameLen, uint8_t **ppOutput, uint32_t *pOutputSize, uint64_t *pPts)
 {
-    static uint8_t scPSBuff[PS_BUFF_SIZE+1] = {0};
-    static uint32_t siPSBuffOffset = 0;
-    static s_frame_buff_t stSFrameBuff[S_FRAME_MAX_COUNT] = {0};
-    static uint32_t siSFrameBuffOffset = 0;
+    // static uint8_t pHandle->scPSBuff[PS_BUFF_SIZE+1] = {0};
+    // static uint32_t pHandle->siPSBuffOffset = 0;
+    // static s_frame_buff_t pHandle->stSFrameBuff[S_FRAME_MAX_COUNT] = {0};
+    // static uint32_t pHandle->siSFrameBuffOffset = 0;
+    if (NULL == pHandle){
+        Loge("Invalid input");
+        return -1;
+    }
     
     int i = 0;
     char type = pFrame[4] & 0x1F;
     if (type == 0x05 || type == 0x01){
-        g_frame_count++;
-        // Logi("[%d]P-FRAME type[0x%02x] len=%d", g_frame_count, type, iFrameLen);
+        pHandle->siFrameCount++;
+        // Logi("[%d]P-FRAME type[0x%02x] len=%d", pHandle->siFrameCount, type, iFrameLen);
     }
     else{
         if (iFrameLen >= S_FRAME_SIZE){
@@ -292,17 +288,17 @@ int create_ps_package(uint8_t *pFrame, uint32_t iFrameLen, uint8_t **ppOutput, u
         else if (type == 8){
             Logi("PPS len:%d\n", iFrameLen);
         }
-        memcpy(stSFrameBuff[siSFrameBuffOffset].ucBuff, pFrame, iFrameLen);
-        stSFrameBuff[siSFrameBuffOffset].uiLen = iFrameLen;
-        siSFrameBuffOffset++;
-        if (siSFrameBuffOffset >= S_FRAME_MAX_COUNT){
+        memcpy(pHandle->stSFrameBuff[pHandle->siSFrameBuffOffset].ucBuff, pFrame, iFrameLen);
+        pHandle->stSFrameBuff[pHandle->siSFrameBuffOffset].uiLen = iFrameLen;
+        pHandle->siSFrameBuffOffset++;
+        if (pHandle->siSFrameBuffOffset >= S_FRAME_MAX_COUNT){
             Loge("Two many S-FRAME");
-            siSFrameBuffOffset = 0;
+            pHandle->siSFrameBuffOffset = 0;
         }
         return 0;
     }    
     
-    uint64_t pts =  (g_frame_count) * 3600;
+    uint64_t pts =  (pHandle->siFrameCount) * 3600;
     if (NULL != pPts){
         if((*pPts) != 0){
             pts = (*pPts);
@@ -312,44 +308,44 @@ int create_ps_package(uint8_t *pFrame, uint32_t iFrameLen, uint8_t **ppOutput, u
         }
     }
     // 1, preare the ps header
-    int len = create_ps_header(scPSBuff,  PS_BUFF_SIZE+1, pts);
-    siPSBuffOffset += len;
+    int len = create_ps_header(pHandle->scPSBuff,  PS_BUFF_SIZE+1, pts);
+    pHandle->siPSBuffOffset += len;
     
     if (type == 0x05){ // i-frame
         // 2, prepare the sys header
-        len = create_sys_header(scPSBuff + siPSBuffOffset, PS_BUFF_SIZE+1 - siPSBuffOffset, pts);
-        siPSBuffOffset += len;
+        len = create_sys_header(pHandle->scPSBuff + pHandle->siPSBuffOffset, PS_BUFF_SIZE+1 - pHandle->siPSBuffOffset, pts);
+        pHandle->siPSBuffOffset += len;
         
         // 3, prepare the sys map
-        len = create_sys_map(scPSBuff + siPSBuffOffset, PS_BUFF_SIZE+1 - siPSBuffOffset, pts);
-        siPSBuffOffset += len;
+        len = create_sys_map(pHandle->scPSBuff + pHandle->siPSBuffOffset, PS_BUFF_SIZE+1 - pHandle->siPSBuffOffset, pts);
+        pHandle->siPSBuffOffset += len;
     }
     
     // 4, pack all the s-frame
-    for (i = 0; i < siSFrameBuffOffset; i++){
-        len = pack_h264_nalu(scPSBuff + siPSBuffOffset, PS_BUFF_SIZE+1 - siPSBuffOffset, stSFrameBuff[i].ucBuff, stSFrameBuff[i].uiLen, pts);
-        siPSBuffOffset += len;
+    for (i = 0; i < pHandle->siSFrameBuffOffset; i++){
+        len = pack_h264_nalu(pHandle->scPSBuff + pHandle->siPSBuffOffset, PS_BUFF_SIZE+1 - pHandle->siPSBuffOffset, pHandle->stSFrameBuff[i].ucBuff, pHandle->stSFrameBuff[i].uiLen, pts);
+        pHandle->siPSBuffOffset += len;
         pts = 0;
     }
-    siSFrameBuffOffset = 0;
+    pHandle->siSFrameBuffOffset = 0;
     
     // 5, pack the i-frame/p-frame here
-    len = pack_h264_nalu(scPSBuff + siPSBuffOffset, PS_BUFF_SIZE+1 - siPSBuffOffset, pFrame, iFrameLen, pts);
-    siPSBuffOffset += len;
+    len = pack_h264_nalu(pHandle->scPSBuff + pHandle->siPSBuffOffset, PS_BUFF_SIZE+1 - pHandle->siPSBuffOffset, pFrame, iFrameLen, pts);
+    pHandle->siPSBuffOffset += len;
     
     // 7, send out the ps packet
-    // Logi("Send (%d)", siPSBuffOffset);
-    // RtpSend(theRtp, (char*)scPSBuff, siPSBuffOffset, g_frame_count * 3600);
-    // siPSBuffOffset = 0;
+    // Logi("Send (%d)", pHandle->siPSBuffOffset);
+    // RtpSend(theRtp, (char*)pHandle->scPSBuff, pHandle->siPSBuffOffset, pHandle->siFrameCount * 3600);
+    // pHandle->siPSBuffOffset = 0;
     // return 0;
     if (NULL != ppOutput){
-        *ppOutput = scPSBuff;
+        *ppOutput = pHandle->scPSBuff;
     }
     if (NULL != pOutputSize){
-        *pOutputSize = siPSBuffOffset;
+        *pOutputSize = pHandle->siPSBuffOffset;
     }
-    int ret = siPSBuffOffset;
-    siPSBuffOffset = 0;
+    int ret = pHandle->siPSBuffOffset;
+    pHandle->siPSBuffOffset = 0;
     return ret;
 }
 
